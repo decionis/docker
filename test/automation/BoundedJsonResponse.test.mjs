@@ -12,6 +12,14 @@ describe("readBoundedJsonResponse", () => {
     assert.deepEqual(await readBoundedJsonResponse(response), { status: "ok" });
   });
 
+  it("accepts a large comparison response within the bounded limit", async () => {
+    const comparison = { patch: "x".repeat(162 * 1024) };
+    const response = new globalThis.Response(JSON.stringify(comparison));
+
+    assert.deepEqual(await readBoundedJsonResponse(response), comparison);
+    assert.equal(defaultMaxJsonResponseBytes, 256 * 1024);
+  });
+
   it("rejects and cancels a streamed response above the byte limit", async () => {
     let cancelled = false;
     const body = new globalThis.ReadableStream({

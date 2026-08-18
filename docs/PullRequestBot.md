@@ -25,11 +25,11 @@ repository that requested it, even when the App installation includes another
 repository.
 
 API requests use bounded retry and timeout controls. Successful JSON responses
-are streamed into a 100 KiB maximum buffer before parsing. Oversized or malformed
+are streamed into a 256 KiB maximum buffer before parsing. Oversized or malformed
 responses fail closed with stable error codes, and failed GitHub responses retain
 only the HTTP status rather than a downstream response body.
 
-`PullRequestBot.yml` handles branch-creation events directly, so its default
+`PrBot.yml` handles branch-creation events directly, so its default
 `GITHUB_TOKEN` needs only Contents read. Its workflow and script are checked out
 from the trusted default branch before the narrowly scoped App token is minted.
 A scheduled scan covers branches that were created before the workflow existed
