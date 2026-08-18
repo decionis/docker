@@ -1,7 +1,9 @@
 # Decionis for Docker
 
-<!-- Badge sweep 2026-08-18: every URL below verified HTTP 200 (rules/discovery.rules.md Rule 1.1).
-     Coverage populates on the first master CI run after the codecov upload step landed. -->
+<!-- Badge sweep 2026-08-18: every URL below verified HTTP 200 (rules/discovery.rules.md Rule 1.1),
+     with two branch-lifecycle caveats that resolve at merge: the decionis.yml badge endpoint
+     registers when the workflow reaches the default branch (this README publishes in the same
+     merge), and coverage populates on the first master CI run after the codecov upload landed. -->
 
 [![CI](https://github.com/decionis/docker/actions/workflows/decionis.yml/badge.svg)](https://github.com/decionis/docker/actions/workflows/decionis.yml)
 [![License](https://img.shields.io/github/license/decionis/docker)](https://github.com/decionis/docker/blob/master/LICENSE)
