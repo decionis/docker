@@ -1,1 +1,32 @@
+# Internal working documents (briefs, plans) stay out of the public repo
 brief.*.md
+
+# Go
+/bin/
+/dist/
+*.test
+*.out
+coverage.*
+
+# Node / TypeScript
+node_modules/
+*.tsbuildinfo
+
+# Extension build artifacts
+extension/ui/build/
+extension/ui/dist/
+
+# Environment & secrets — never committed (rules/security.rules.md Rules 1.4, 2.x)
+.env
+.env.*
+*.env
+*.pem
+*.key
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Scratch
+tmp/

@@ -1,112 +1,87 @@
-# Security & Performance Operational Rules
+# Security & Performance Operational Rules — decionis/docker
 
-These rules apply to the Decionis monorepo. They are release requirements and continuous agent context alongside `coding.rules.md`. They do not authorize testing any external system; load and penetration simulations MUST use local injection, loopback, or an explicitly isolated Decionis test environment.
+These rules apply to the `decionis/docker` monorepo. They are release requirements and continuous agent context alongside `coding.rules.md` and `discovery.rules.md`. They are the Docker-surface localization of the Decionis security rules: the hosted control plane's rules (authentication, rate-limiting, OTP lifecycle, sessions, Account integration modes, migrations) live with the control plane in `decionis/decionis` and are intentionally not restated here — this repository must never contain the systems those rules govern. These rules do not authorize testing any external system; load and penetration simulations MUST use local injection, loopback, or an explicitly isolated Decionis test environment.
 
-## 1. Authentication & Rate-Limiting Rules
+## 0. Boundary & Authority Rules
 
-- Rule 1.1: Max login attempts per IP = 10 per minute per authentication route. Exceeding returns HTTP 429.
-- Rule 1.2: Account lock trigger = 5 failed attempts per normalized username within 15 minutes. Lock state MUST be atomic and shared across API replicas. A successful login clears prior failures. The lock MUST expire automatically and MUST NOT permanently lock a legitimate user.
-- Rule 1.3: IP resolution MUST validate the direct proxy against explicit trusted IP/CIDR subnets before using `X-Forwarded-For`. `TRUST_PROXY=1` without `TRUST_PROXY_CIDRS` is invalid and MUST fail closed to socket-IP resolution. `Client-IP` and similar client-controlled headers MUST NOT be trusted.
-- Rule 1.4: Production rate limiting MUST remain enabled even if `RATE_LIMIT=0` is supplied. General API limits are keyed by `(resolved IP + normalized route)`. Authentication route IP windows MUST use the shared Postgres store (or an approved equivalent) across replicas; authenticated or identity-sensitive routes MUST also enforce a durable user/principal-scoped limit.
-- Rule 1.5: HTTP 429 responses MUST include `Retry-After`, `X-RateLimit-Limit`, and `X-RateLimit-Remaining`. Error bodies MUST use a stable, non-sensitive code and MUST NOT reveal whether a username exists.
-- Rule 1.6: A rate-limit or login-throttle backing-store error MUST block the protected action. `skipOnError` MUST remain false. Missing security migrations return a safe 5xx response; they MUST NOT bypass throttling.
-- Rule 1.7: Password verification MUST use an asynchronous, memory-hard derivation and a constant-time hash comparison. Unknown usernames MUST execute the same dummy password-derivation path to reduce timing-based account enumeration.
+- Rule 0.1: This repository is the Docker integration surface. It MUST NOT contain control-plane code, user authentication, session or OTP logic, database migrations, dossier signing keys, or production credentials. If a change appears to need one of these, it belongs upstream in `decionis/decionis`.
+- Rule 0.2: No component in this repo mints authority. The daemon, proxy, CLI, extension, and Dev Container helper request, transport, enforce, and display decisions produced by the evaluator — the containerized `@decionis/mcp` evaluator or the hosted control plane. Re-implementing policy evaluation, verdict semantics, or dossier issuance here is a security defect, not merely an architecture violation.
+- Rule 0.3: Fail closed. Wherever a component gates execution on a decision, an unreachable evaluator, timeout, malformed or unverifiable response, or internal error MUST resolve to the blocking outcome. A timeout is never an approval. `skipOnError`-style toggles MUST NOT exist.
+- Rule 0.4: Cryptography in this repo is verification-only: Decision Dossier and Presence proof verification uses published JWKS and Ed25519 signature verification. Signing keys and key-generation for authority evidence MUST NOT exist in this repo, its images, or its CI.
+- Rule 0.5: Discovery and metadata surfaces are inert: they describe, they never mint, proxy, or expose per-record data, and they take no free-text input into rendered output.
 
-## 2. OTP Lifecycle Standards
+## 1. Supply Chain & Image Rules
 
-- Rule 2.1: OTP max validity duration = 300 seconds (5 minutes). Configuration above this ceiling MUST be clamped or rejected.
-- Rule 2.2: Max verification attempts per OTP generation = 3 attempts. The attempt increment MUST be atomic; the OTP becomes unusable at the third failure.
-- Rule 2.3: Used OTPs must be invalidated atomically in memory/cache/database upon first successful check. Parallel verification requests for one OTP MUST result in no more than one successful claim/session.
-- Rule 2.4: OTP material MUST be generated with a cryptographically secure random source and stored only as a salted/secret-bound hash. Raw OTPs, salts, challenge tokens, passwords, session tokens, cookies, and authorization headers MUST be redacted from logs.
-- Rule 2.5: OTP signing/HMAC secrets are mandatory in production. Debug OTP echo is forbidden in production and is permitted only under the automated test runtime or local development.
-- Rule 2.6: OTP expiry MUST be checked against the authoritative server/database clock during the atomic mutation, not only during a prior read.
+- Rule 1.1: Base images MUST be pinned by digest, not floating tags. Go binaries ship in minimal images (distroless/static or scratch, plus CA certificates where needed); Node-based images use the current maintained LTS with a documented upgrade cadence.
+- Rule 1.2: Every image builds via multi-stage Dockerfiles, runs as a dedicated non-root user, and declares a read-only root filesystem wherever the runtime allows. Capabilities are dropped by default; none are added without a documented need.
+- Rule 1.3: The MCP runtime image consumes the published `@decionis/mcp` artifact at an exact pinned version — never a floating range, never a checkout of the private monorepo. Version bumps are explicit PRs that re-run the tool-inventory drift gate (discovery rule 1.4).
+- Rule 1.4: Secrets MUST NOT enter images by any path: no secrets in layers, build args, `ENV`, labels, or committed compose files. `.dockerignore` exists in every build context and excludes env files, keys, and local state.
+- Rule 1.5: Release builds publish SBOM and provenance attestations, and images are signed with the org's approved mechanism. GitHub Actions are pinned to commit SHAs; third-party actions require review before adoption.
+- Rule 1.6: A vulnerability scan gates release: critical/high findings in a published image block the release until fixed, upgraded, or explicitly risk-accepted in the PR with an expiry date.
+- Rule 1.7: Version tags are immutable; a published tag is never rebuilt in place.
 
-## 3. Endpoint Resilience & Anti-Spam
+## 2. Secrets & Credential Handling
 
-- Rule 3.1: Global payload limit is 100 KB on unauthenticated endpoints. Larger authenticated upload routes require an explicit route-level override, schema validation, file-count limits, and a documented business need.
-- Rule 3.2: Load shedding triggers at 80% of configured process in-flight capacity and returns HTTP 503 with `Retry-After` rather than accepting unbounded work. Health and readiness probes remain available for orchestration.
-- Rule 3.3: Default API request timeout = 15 seconds, connection timeout = 5 seconds, and keep-alive timeout = 5 seconds. Downstream clients MUST use finite timeouts and bounded retries with jitter.
-- Rule 3.4: Database and downstream connection pools MUST have explicit maximum sizes and finite acquisition/connection timeouts. Queue depth, in-flight requests, 429 rate, 503 rate, latency, CPU, memory, and pool saturation MUST be observable.
-- Rule 3.5: Malformed, oversized, or deeply nested payloads MUST fail with a bounded 4xx response. Unhandled 5xx responses MUST use a generic message and MUST NOT expose stack traces, SQL, credentials, internal paths, or raw request bodies.
-- Rule 3.6: Public write endpoints MUST combine schema bounds, per-route IP throttling, and a durable identity/content limit where an attacker can rotate addresses.
+- Rule 2.1: The local evaluator path requires zero credentials by design; nothing in this repo may quietly add a credential requirement to it (that is also a discovery rule 1.2 violation).
+- Rule 2.2: Connected mode uses an org API key supplied by the user at runtime — via Docker secrets, runtime env, or the extension's settings flow. The key is held by the daemon (backend) only. It MUST NOT appear in: extension frontend code, browser/webview storage, image layers, labels, compose files in the repo, logs, or crash output.
+- Rule 2.3: The extension UI never holds or transmits credentials to anything except the extension backend over the Docker Desktop extension socket. All hosted-API calls that use credentials happen in the daemon.
+- Rule 2.4: Logs and telemetry contain hashes and stable identifiers only. API keys, bearer tokens, `Authorization` headers, Presence proof tokens, cookies, dossier payload bodies, and raw request/response bodies MUST be redacted at the logging boundary, with a test proving redaction.
+- Rule 2.5: Credentials at rest (daemon state volume) are stored in a file with `0600` permissions inside the backend's private volume, never in shared/bind-mounted host paths chosen by default.
+- Rule 2.6: All control-plane communication uses HTTPS with certificate verification on; disabling TLS verification is prohibited in production builds, including via env toggles.
 
-## 4. Session & Credential Revocation
+## 3. Daemon, Proxy & Extension Backend Resilience
 
-- Rule 4.1: Every session token MUST have an issued-at time, an absolute expiry, a token type, and a cryptographically random nonce or server-side session identifier. Consumer and account sessions MUST expire in no more than 7 days unless a reviewed policy requires a shorter lifetime.
-- Rule 4.2: Password reset, password change, account disablement, OTP recovery, or suspected compromise MUST revoke all active sessions and refresh tokens for that identity across devices. Password reset/change MUST atomically increment the server-validated `account_session_versions.version` with the credential update. Password change may issue one replacement session at the new version; password reset clears the local cookie and requires a fresh sign-in.
-- Rule 4.5: Password reset start responses MUST be indistinguishable for known and unknown usernames. Reset OTPs use a dedicated production secret, expire within five minutes, allow at most three attempts, and are atomically claimed and consumed with the password update.
-- Rule 4.3: Signing-key rotation MUST support an explicit overlap window for verification and a defined forced-revocation procedure. Shared fallback secrets between OTPs and sessions are prohibited in production.
-- Rule 4.4: Sign-out MUST clear client cookies/storage. Security-sensitive server sessions (including auditor sessions) MUST also support server-side revocation and check revocation on every protected request.
-- Rule 4.6: Account-authoritative tenant reads MUST verify Account Ed25519 evidence against the Account JWKS. Cohort cutover may restrict legacy access but MUST NOT create access absent from the legacy projection. Missing mappings, invalid signatures, parity-store failures, or Account unavailability fail closed for selected cohorts.
-- Rule 4.7: Non-legacy Account tenant reads MUST pass the durable rollout-evidence gate before making an Account authority request. Shadow entry requires 14 consecutive eligible daily reference snapshots, at least one observed adoption, >=99.99% successful shadow adoption, and zero unresolved adoption conflicts. Authoritative entry additionally requires complete signed backfill, recent parity in membership, entitlement, and tenant-discovery reads, zero errors or privilege expansions, and a recent successful staging-to-legacy rollback exercise. Evidence-store failure preserves legacy shadow/non-selected behavior and fails selected authoritative cohorts closed.
-- Rule 4.8: `DECIONIS_ACCOUNTS_TENANCY_MUTATION_MODE` defaults to `legacy`. `authoritative` tenant provisioning MUST pass the Phase-2 authoritative rollout gate before any Account request, use the runtime Account service credential rather than the migration credential, and fail closed on gate, transport, contract, mapping, or projection-event uncertainty. Account MUST write first; Decionis then consumes the returned `account.workspace.provisioned` event exactly once into its UUID compatibility projection.
-- Rule 4.9: In authoritative mode, non-owner membership role changes and removals MUST be written by Account before Decionis mutates its UUID projection. The Account operation journal and Decionis event inbox MUST reject idempotency/event rebinding, and the projection MUST ignore stale membership revisions delivered out of order. Removal succeeds only after Account confirms all-device session revocation. Owner promotion, demotion, or removal fails closed until the dedicated ownership-transfer workflow exists.
-- Rule 4.10: In authoritative mode, Stripe, marketplace, and trusted native-billing entitlement changes MUST be written by Account before Decionis updates product-local limits. The Account journal and Decionis inbox MUST bind organization, workspace, entitlement, product, plan, environment, state, event identity, and monotonic revision. Stale revisions are consumed for replay evidence but MUST NOT mutate the local projection; ambiguity fails closed.
-- Rule 4.11: In Account-authoritative mode, ownership transfer MUST use the dedicated owner-authorized ceremony and require a non-empty `Idempotency-Key` of at most 200 characters; direct owner promotion, demotion, and removal remain prohibited. Account is written first, and Decionis MUST project both UUID roles and opaque membership revisions in one transaction. Self-transfer, stale source ownership, target owners, partial projection, event rebinding, missing references, and downstream uncertainty fail closed. The default legacy window preserves existing PATCH/DELETE behavior until cutover.
-- Rule 4.12: In Account-authoritative mode, tenant OIDC/SAML configuration MUST be written to Account before Decionis updates its compatibility projection. The mutation and event MUST bind the synchronized tenant, protocol, complete semantic-configuration SHA-256 digest, secret-presence flag, and monotonic revision. OIDC client secrets MUST be encrypted in Account and in any temporary Decionis projection; client secrets, certificate bodies, metadata documents, authorization headers, and downstream bodies MUST NOT enter responses, events, logs, or projection evidence. Gate, transport, custody, response, tenant-binding, event-rebinding, or revision ambiguity fails closed without a legacy write.
-- Rule 4.13: `DECIONIS_ACCOUNTS_SSO_OIDC_MODE` defaults to `legacy`. In `authoritative`, the public OIDC URLs and response shapes remain stable, but Decionis MUST delegate discovery, state/nonce, client-secret use, code exchange, token verification, Account identity resolution, and membership resolution to Account after the Phase-2 rollout gate passes. Decionis consumes the returned `account.sso.oidc.authenticated` event exactly once in the same transaction that creates or updates its UUID compatibility user/membership projection. The service response/event and local evidence MUST be fully tenant-, provider-, user-, membership-, role-, revision-, and subject-hash-bound. Gate, Account, event, tenant mapping, or projection uncertainty fails closed without consulting the local IdP configuration. Raw subjects, state, authorization codes, ID/access tokens, IdP secrets, authorization headers, emails, display names, and downstream bodies MUST NOT enter event evidence or logs; verified email/name may cross only the authenticated Account-to-Decionis response for UUID projection.
-- Rule 4.14: `DECIONIS_ACCOUNTS_SSO_SAML_MODE` defaults to `legacy`. In `authoritative`, the public SAML start/ACS URLs, UUIDs, status codes, and successful response shapes remain stable, but Decionis MUST delegate RelayState, XMLDSIG, signed-reference claim parsing, issuer/audience/ACS clock binding, assertion replay, Account identity resolution, and membership resolution to Account after the Phase-2 gate passes. Decionis consumes `account.sso.saml.authenticated` once in the transaction that advances its UUID compatibility projection. The receipt MUST bind tenant, provider, user, membership, role, revisions, and SHA-256 subject/email/assertion hashes. Missing RelayState, gate/Account ambiguity, event rebinding, stale provider reference, or projection failure fails closed without consulting local SAML configuration. Raw assertions, NameIDs, emails, display names, RelayState, certificates, attributes, and downstream bodies MUST NOT enter durable evidence or logs; verified email/name may cross only the service-authenticated projection response.
-- Rule 4.15: `DECIONIS_ACCOUNTS_INVITATION_MODE` defaults to `disabled`. In `authoritative`, tenant invitation create/revoke MUST pass the Phase-2 gate, require an admin-authorized request plus a bounded `Idempotency-Key`, bind an organization API key's creator to the submitted actor UUID, send the immutable organization and actor UUIDs to Account, and persist the returned tenant-bound event before success. The facade MUST NOT offer owner invitations, create a local user/membership, deliver email, or fall back to `POST /orgs/:orgId/memberships`. Projection evidence and telemetry may contain opaque invitation/tenant/actor IDs and the SHA-256 email hash only; raw email, invitation token/digest, authorization header, and downstream body are prohibited. Gate, Account, response/event binding, tenant mapping, or projection uncertainty fails closed. Auditor-room and dossier invitations remain Decionis-owned.
-- Rule 4.16: Every deployed Account integration mode MUST be explicit and default to `legacy` or `disabled`. Enabling shadow adoption requires the dedicated migration credential; enabling Account reads, mutations, OIDC/SAML runtime, or tenant invitations requires the distinct runtime service credential. These credentials MUST be delivered only to the Decionis API, not worker or protocol. Production startup and deployment configuration MUST reject invalid modes, non-integer cohorts outside 0–100, shared credentials, missing required credentials, and non-HTTPS or credential-bearing Account URLs before accepting traffic. Raw credentials MUST remain in approved secret stores and MUST NOT enter logs, manifests, repository variables, or tracked files.
+- Rule 3.1: Default network posture is private: the daemon binds to localhost or a unix/extension socket only. Binding to `0.0.0.0` or exposing a control port requires explicit user opt-in and is off by default. No unauthenticated TCP control surface ships enabled.
+- Rule 3.2: Enforcement components (authority proxy, `govern` execution paths) implement Rule 0.3 literally: evaluator unreachable, malformed verdict, expired evidence, or verification failure resolves to the blocking outcome, and the failure reason is surfaced — never silently swallowed.
+- Rule 3.3: Bounded inputs: request payloads default to a 100 KB limit; larger routes require an explicit override, schema validation, and a documented need. Malformed, oversized, or deeply nested payloads fail with a bounded 4xx.
+- Rule 3.4: Finite time everywhere: default request timeout 15 seconds, connection timeout 5 seconds, keep-alive 5 seconds; downstream clients use finite timeouts and bounded retries with jitter. Retries never apply to non-idempotent enforcement decisions.
+- Rule 3.5: Load shedding triggers at 80% of configured in-flight capacity and returns 503 with `Retry-After` rather than accepting unbounded work; health/readiness probes remain available.
+- Rule 3.6: Unhandled errors return a generic message. Stack traces, internal paths, credentials, and raw bodies MUST NOT appear in responses.
+- Rule 3.7: Connection pools and queues have explicit maximum sizes and finite acquisition timeouts. Queue depth, in-flight requests, shed rate, latency, and memory MUST be observable locally.
 
-## 5. Defensive Validation Requirements
+## 4. Extension Privilege Rules
 
-- Rule 5.1: Credential-stuffing regression tests MUST simulate at least 25,000 local sequential/burst requests, vary spoofed forwarding headers, and verify exactly the configured allowance is accepted while the remainder returns 429 with standard headers.
-- Rule 5.2: OTP race tests MUST send at least 100 concurrent checks for one code and assert that at most one succeeds. Tests MUST cover expiry, three invalid attempts, correct-code replay, and delivery-failure invalidation.
-- Rule 5.3: Proxy tests MUST cover direct clients, trusted proxies, untrusted proxies, multiple forwarding hops, invalid CIDRs, and attempts to rotate `X-Forwarded-For`/`Client-IP`.
-- Rule 5.4: Resilience tests MUST cover a failed rate-limit store, failed database connection, oversized JSON, malformed JSON, deeply nested input, saturation/load shedding, finite timeouts, and generic error responses without stack traces.
-- Rule 5.5: Load tests MUST run only against Fastify injection, loopback, or a specifically authorized isolated Decionis environment. Production, third-party, marketplace, and customer endpoints are out of scope by default.
-- Rule 5.6: Tenant invitation tests MUST cover default-off behavior, authorization and scope enforcement, required bounded idempotency, deterministic retry binding, actor rejection, existing-member conflict, Account unavailability, event rebinding, missing tenant mapping, projection rollback, and raw email/token exclusion. Account-side tests MUST prove 100 concurrent create reservations converge and parallel acceptance permits exactly one membership creation.
+- Rule 4.1: Least privilege by construction: the extension requests only the capabilities it demonstrably uses. Every privilege in `metadata.json` (backend service, host binaries, mounts) is enumerated and justified in `SECURITY.md`, and the justification is part of review for any change to `metadata.json`.
+- Rule 4.2: The Docker Engine socket is not mounted unless a shipped feature requires it. Any socket use is observation-scoped until an enforcement design is explicitly reviewed; "the extension can" never silently becomes "the extension does."
+- Rule 4.3: Host binaries shipped with the extension are signed/verifiable artifacts built in this repo's CI, not downloaded at runtime. The extension MUST NOT download and execute code post-install.
+- Rule 4.4: The extension backend treats the UI as untrusted input: every request over the extension socket is schema-validated with bounded sizes (Rule 3.3) before acting.
+- Rule 4.5: Nothing in the extension executes instructions found in decision content, policy text, or dossier fields; these render as data. Links out of the extension open in the system browser via the Desktop API only.
 
-## 6. Release & Operations Checklist
+## 5. Presence & Human Approval Rules
 
-- Apply all migrations, including `0108_AuthSecurityHardening.sql`, `0109_PasswordResetAndSessionRevocation.sql`, `0110_AccountTenantReferences.sql`, `0111_AccountTenantReadParity.sql`, `0112_AccountTenantRolloutEvidence.sql`, `0113_AccountTenantProjectionEvents.sql`, `0114_AccountMembershipProjections.sql`, `0115_AccountEntitlementProjections.sql`, `0116_AccountOwnershipProjections.sql`, `0117_AccountIdentityProviderProjections.sql`, `0118_AccountOidcSsoProjections.sql`, `0119_AccountSamlSsoProjections.sql`, `0120_AccountInvitationProjections.sql`, `0121_AccountLegacyRetirementEvidence.sql`, `0122_BoardIamDatabaseRole.sql`, `0123_ConnectorEnrollments.sql`, `0124_BoardChannelAxis.sql`, and `0125_AgentSafeExecutionAuthority.sql`, before deploying the corresponding API build.
-- Configure unique production secrets for account OTPs, account sessions, consumer sessions, and auditor OTPs through the approved secret manager.
-- Configure distinct `DECIONIS_ACCOUNTS_MIGRATION_TOKEN` and `DECIONIS_ACCOUNTS_SERVICE_TOKEN` GitHub Actions `production` environment secrets plus explicit default-off Account rollout variables before deploying the Phase-3 runtime wiring.
-- Configure `TRUST_PROXY_CIDRS` to the exact load-balancer/reverse-proxy ranges; do not use blanket proxy trust.
-- Confirm login and OTP routes return 429 plus all standard rate-limit headers at their thresholds.
-- Confirm rate-limit and authentication stores fail closed during a controlled dependency outage.
-- Confirm logs and telemetry contain hashes/stable identifiers only and never credentials, OTPs, bearer tokens, cookies, or raw sensitive payloads.
-- Run API type-checking and the targeted authentication security, consumer auth, auditor portal, and authorization/billing test suites before merge.
+- Rule 5.1: The approval ceremony (passkey/WebAuthn, trusted device) executes on the human's authenticator via the hosted Presence surface. Components in this repo initiate and observe the ceremony; they MUST NOT implement, proxy, or terminate the credential exchange, and raw biometric or credential material never transits them.
+- Rule 5.2: Presence proof tokens are treated as secrets (Rule 2.4), are single-use and action-bound by contract, and are relayed only to the control plane that issued the challenge — never persisted beyond the pending action's lifetime.
+- Rule 5.3: An approval outcome is accepted only from the authoritative API response, never inferred from UI state, elapsed time, or a client-side callback alone.
+- Rule 5.4: A pending HOLD that expires, errors, or loses connectivity resolves to the blocking outcome and says so (Rule 0.3).
 
-## 7. Current Validation Entry Points
+## 6. MCP Evaluator Container Rules
 
-- `apps/api/test/security/AuthenticationSecurity.test.ts`: 25,000-request credential-stuffing simulation, forwarding-header spoofing, OTP concurrency/retry, fail-closed limiter, and payload-size validation.
-- `apps/api/test/db/repositories/ConnectorEnrollmentsRepo.pg.test.ts`: real-engine single-winner claim under 100 concurrent exchanges, database-clock expiry, consume/replay rejection, and per-org issuance-cap validation for connector enrollment tokens.
-- `apps/api/test/routes/connectorEnrollments.test.ts`: enrollment mint gating (ADMIN + org:keys:write), unknown-connector rejection, 429 header trio, hash-only repo input, token/raw-key log-redaction, and exchange scope-narrowing validation.
-- `apps/api/test/security/AccountSessionSecurity.test.ts`: dedicated production key material and strict absolute-expiry validation.
-- `apps/api/test/security/PublicAccountOtpRepoSecurity.test.ts`: transaction-scoped rate-limit locking and fail-closed OTP issuance validation.
-- `apps/api/test/http/RequestCapacityGuard.test.ts`: 80% admission-control and recovery validation.
-- `apps/api/test/http/PostgresRateLimitStore.test.ts`: replica-shared authentication windows, opaque keys, and backing-store failure propagation.
-- `apps/api/test/http/SecurityPolicy.test.ts`: production rate-limit, trusted-proxy, CORS, and server-limit policy validation.
-- `apps/api/test/routes/consumer.test.ts`: OTP retry exhaustion/replay and consumer-session expiry validation.
-- `apps/api/test/routes/auditorPortal.test.ts`: auditor OTP/session lifecycle validation.
-- `apps/api/test/routes/authzAndBilling.test.ts`: public account OTP, password sign-in, password change/reset, cross-device session revocation, reset retry exhaustion, five-failure lockout, and standardized 429 header validation.
-- `apps/api/test/security/PasswordResetRepoSecurity.test.ts`: serialized reset issuance plus atomic credential update, OTP consumption, and identity-session epoch advancement.
-- `apps/api/test/services/accounts/AccountTenantAuthority.test.ts`: signed JWKS verification, default-off shadow behavior, restrictive cohort reads, non-expansion, and invalid-evidence fail-closed behavior.
-- `apps/api/test/services/accounts/AccountTenantBackfill.test.ts`: member-level idempotent backfill, conservative role mapping, IdP-secret exclusion, and signed count evidence persistence.
-- `apps/api/test/services/accounts/AccountTenantRolloutGate.test.ts`: 14-day continuity, signed-backfill coverage, read-parity dimensions, privilege-expansion rejection, rollback recency, and evidence-store fail-closed behavior.
-- `apps/api/test/services/accounts/AccountTenantRolloutCommandParser.test.ts`: strict bounded operator command and rollback-attestation argument validation.
-- `apps/api/test/db/repositories/AccountTenantReferencesRepo.test.ts`: atomic reference-state and sanitized shadow-adoption observation persistence.
-- `apps/api/test/db/repositories/AccountTenantRolloutRepo.test.ts`: immutable previous-UTC-day capture, aggregate-only evidence, and timezone-stable windowing.
-- `apps/api/test/services/accounts/AccountTenantProvisioning.test.ts`: default-off behavior, authoritative rollout gating, runtime service authentication, response/event binding, and fail-closed contract validation.
-- `apps/api/test/db/repositories/AccountTenantProjectionRepo.test.ts`: atomic opaque-reference update and idempotent projection-event receipt.
-- `apps/api/test/services/accounts/AccountMembershipLifecycle.test.ts`: default-off behavior, rollout gating, conservative role mapping, all-device removal proof, and response/event binding.
-- `apps/api/test/db/repositories/AccountMembershipProjectionRepo.test.ts`: transactional tenant-binding validation, UUID projection, opaque member reference, event replay, and conflict rollback.
-- `apps/api/test/routes/org/OrgMembershipRoutes.test.ts`: unchanged legacy writer, Account-first authoritative projection, request idempotency propagation, and fail-closed downstream behavior.
-- `apps/api/test/services/accounts/AccountEntitlementLifecycle.test.ts`: default-off behavior, rollout gating, request/event binding, and Account-first projection receipts.
-- `apps/api/test/db/repositories/AccountEntitlementProjectionRepo.test.ts`: atomic tenant binding, replay rejection, and out-of-order entitlement revision handling.
-- `apps/api/test/services/accounts/AccountOwnershipTransfer.test.ts`: default-off behavior, rollout gating, request/event binding, and Account-first two-member receipts.
-- `apps/api/test/db/repositories/AccountOwnershipProjectionRepo.test.ts`: atomic two-role projection, exact replay, event rebinding rejection, and partial-revision rollback.
-- `apps/api/test/routes/org/OrgMembershipRoutes.test.ts`: unchanged owner guards plus legacy and Account-authoritative transfer paths.
-- `apps/api/test/services/accounts/AccountIdentityProviderLifecycle.test.ts`: default-off behavior, rollout gating, full-configuration digest binding, deterministic retries, and secret-free event validation.
-- `apps/api/test/db/repositories/AccountIdentityProviderProjectionRepo.test.ts`: atomic tenant-bound projection, encrypted local OIDC custody, exact replay, event rebinding rejection, and revision conflict rollback.
-- `apps/api/test/routes/org/OrgIdentityRoutes.test.ts`: unchanged OIDC/SAML API surface, legacy writer preservation, Account-first projection, and fail-closed downstream behavior.
-- `apps/api/test/services/accounts/AccountOidcSsoLifecycle.test.ts`: default-off behavior, rollout gating, response/event binding, and secret-free Account completion projection.
-- `apps/api/test/db/repositories/AccountOidcSsoProjectionRepo.test.ts`: transactional UUID user/membership projection, tenant binding, event rebinding rejection, and email-free evidence.
-- `apps/api/test/services/accounts/AccountSamlSsoLifecycle.test.ts`: default-off behavior, rollout gating, response/event hash binding, and assertion-free Account projection.
-- `apps/api/test/db/repositories/AccountSamlSsoProjectionRepo.test.ts`: tenant/provider-bound UUID projection and raw-identity-free, verified-signature evidence.
-- `apps/api/test/routes/SsoRoutes.test.ts`: unchanged public OIDC/SAML success shapes and Account-authoritative bypass of local IdP configuration.
-- `apps/api/test/services/accounts/AccountTenantInvitationLifecycle.test.ts`: default-off behavior, rollout gating, request/event binding, conservative role mapping, and email-free projection receipts.
-- `apps/api/test/db/repositories/AccountInvitationProjectionRepo.test.ts`: atomic tenant binding, exact event replay, rebinding rejection, and hash-only evidence.
-- `apps/api/test/routes/org/OrgInvitationRoutes.test.ts`: admin/scope facade, bounded idempotency, Account-first projection, sanitized errors, and raw-email exclusion.
+- Rule 6.1: The local evaluator container preserves upstream's contract: zero network, zero credentials, nothing recorded. Default run configuration disables networking where the client allows, mounts the policy file read-only, runs non-root with a read-only root filesystem, and writes no persistent state.
+- Rule 6.2: Any locally-added behavior that touches the evaluator's claims (for example, an opt-in event sink for the extension) MUST be default-off, documented, and reflected verbatim in every surface that repeats the claims (discovery rule 1.2) — in the same PR.
+- Rule 6.3: Tool descriptions state their fail-closed semantics truthfully and match the pinned upstream version exactly (drift gate).
+
+## 7. Defensive Validation Requirements
+
+- Rule 7.1: Fail-closed tests are mandatory for every enforcement path: evaluator down, evaluator slow (timeout), malformed verdict, unverifiable signature, and mid-action connectivity loss MUST each resolve to the blocking outcome in an automated test.
+- Rule 7.2: Redaction tests assert that API keys, tokens, `Authorization` headers, and Presence proofs never appear in logs or error output, using representative secret-shaped fixtures.
+- Rule 7.3: Resilience tests cover oversized payloads, malformed JSON, deeply nested input, saturation/load shedding, finite timeouts, and generic error responses without stack traces.
+- Rule 7.4: Image tests assert non-root execution, expected user/filesystem posture, absence of secret-shaped content in layers, and (for the evaluator image) a passing MCP handshake with the exact expected tool inventory.
+- Rule 7.5: Load tests run only against local injection, loopback, or an explicitly isolated Decionis test environment. Production, third-party, marketplace, and customer endpoints are out of scope by default.
+
+## 8. Release & Operations Checklist
+
+- All images: pinned-digest bases current, non-root verified, scan gate green, SBOM + provenance published, signatures verified.
+- MCP runtime image: pinned `@decionis/mcp` version matches the catalog entry and tool-inventory drift gate.
+- Extension: `docker extension validate` green; `metadata.json` privileges unchanged or re-justified in `SECURITY.md`.
+- Fail-closed suites (Rule 7.1) and redaction suites (Rule 7.2) green.
+- No credentials, tokens, or proof material in logs, images, manifests, repository variables, or tracked files.
+- Runbooks in `docs/marketplace/` updated with any new secrets, orderings, or user-owned submission steps.
+
+## 9. Current Validation Entry Points
+
+No component code has landed yet, so no suites exist to enumerate — listing them now would violate verify-then-claim. This section MUST be updated by the same PR that lands each component, with the planned homes:
+
+- `mcp-server/test/` — image posture (non-root, read-only, no-network default), MCP handshake, tool-inventory drift gate (Rules 6.x, 7.4).
+- `internal/**/*_test.go` — daemon/proxy fail-closed, redaction, bounded-input, and load-shedding suites (Rules 3.x, 7.1–7.3).
+- `extension/test/` — extension-socket schema validation, UI-credential exclusion, verdict-label drift gate (Rules 2.3, 4.4; discovery rule 2.6).
+- `features/govern/test/` — feature install/wiring validation, default-off behavior of any opt-in (Rule 6.2).

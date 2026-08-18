@@ -1,0 +1,5 @@
+# Build context is exactly the pin manifest + lockfile; everything else stays
+# out of the image build (rules/security.rules.md Rule 1.4).
+*
+!package.json
+!package-lock.json
