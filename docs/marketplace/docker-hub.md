@@ -57,3 +57,4 @@ custody, orderings, and every user-owned manual step live here.
 
 | Date | Tag | Digest | Notes |
 | ---- | --- | ------ | ----- |
+| 2026-08-18 | `mcp-v0.1.2` → `decionis/mcp:0.1.2` + `:latest` | `sha256:494710a805399eafedf2c2e77b75249835afd0c159a26ef02f58911561135a44` | First publish. Multi-arch (linux/amd64 + linux/arm64), provenance + SBOM attestations, cosign keyless signature (created in CI; verify locally with the cosign command above once cosign is installed). Full smoke suite re-run green against the published image. Overview paste into the Hub description still pending (user-owned). |

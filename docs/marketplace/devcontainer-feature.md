@@ -39,3 +39,4 @@ docker run --rm -v /tmp/decionis_local.tar.gz:/tmp/cli.tar.gz:ro \
 
 | Date | Version | Where | Notes |
 | ---- | ------- | ----- | ----- |
+| 2026-08-18 | CLI `cli-v0.1.0` (prerequisite, ordering step 1) | GitHub release | linux/darwin × amd64/arm64 + `SHA256SUMS`; `decionis_darwin_arm64` checksum-verified and executed locally (`decionis version` → 0.1.0). Feature publication to `ghcr.io/decionis/features` still pending (steps 3–4). |
