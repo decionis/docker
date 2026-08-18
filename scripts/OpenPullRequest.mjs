@@ -10,6 +10,8 @@ const maxAttemptsLimit = 3;
 const maxPages = 3;
 const perPage = 100;
 const branchCreationWorkflow = ".github/workflows/PrBot.yml";
+const prBodySectionLimit = 8 * 1024;
+const commitHeadlineLimit = 160;
 
 export class GitHubApiError extends Error {
   constructor(message, status) {
@@ -25,6 +27,181 @@ function boundedInteger(value, fallback, maximum, name) {
     throw new Error(name + " must be a positive safe integer");
   }
   return Math.min(resolved, maximum);
+}
+
+function normalizeMarkdown(value) {
+  return typeof value === "string"
+    ? value.replace(/\r\n?/g, "\n").replace(/\n{3,}/g, "\n\n").trim()
+    : "";
+}
+
+function boundedHeadline(value, fallback) {
+  const headline = normalizeMarkdown(value).split("\n")[0]?.trim() || fallback;
+  return headline.length <= commitHeadlineLimit
+    ? headline
+    : headline.slice(0, commitHeadlineLimit - 3).trimEnd() + "...";
+}
+
+function boundedSection(value, fallback, limit = prBodySectionLimit) {
+  const section = normalizeMarkdown(value) || fallback;
+  if (section.length <= limit) return section;
+  const suffix = "\n\n_Content truncated by Decionis Bot._";
+  return section.slice(0, Math.max(0, limit - suffix.length)).trimEnd() + suffix;
+}
+
+function normalizedHeading(heading) {
+  return heading.toLowerCase().replace(/[`*_]/g, "").trim();
+}
+
+function categoryFromHeading(heading) {
+  const normalized = normalizedHeading(heading);
+  if (/\b(test plan|tests?|testing|verification|checks?|qa)\b/.test(normalized)) {
+    return "test";
+  }
+  if (/\b(validation|acceptance|proof)\b/.test(normalized)) return "validation";
+  if (normalized === "what & why" || normalized === "what and why") return "result";
+  if (/\b(problem|why|motivation|context|background|root cause)\b/.test(normalized)) {
+    return "problem";
+  }
+  if (
+    /\b(result|changes?|what changed|implementation|impact|solution|boundary|publish gates?)\b/.test(
+      normalized,
+    )
+  ) {
+    return "result";
+  }
+  if (/\b(summary|overview)\b/.test(normalized)) return "summary";
+  return "result";
+}
+
+function shouldPreserveHeading(heading, category) {
+  const normalized = normalizedHeading(heading);
+  const canonicalHeadings = {
+    summary: ["summary"],
+    problem: ["problem"],
+    result: ["result"],
+    test: ["test", "tests", "testing"],
+    validation: ["validation"],
+  };
+  return !canonicalHeadings[category].includes(normalized);
+}
+
+function parseCommitMessage(commit, index) {
+  const message = normalizeMarkdown(commit?.commit?.message);
+  const [subject = "", ...bodyLines] = message.split("\n");
+  const headline = boundedHeadline(subject, "Commit " + (index + 1));
+  const sections = { summary: [], problem: [], result: [], test: [], validation: [] };
+  let category = "summary";
+  let heading;
+  let lines = [];
+
+  const flush = () => {
+    const text = normalizeMarkdown(lines.join("\n"));
+    if (text) sections[category].push({ heading, text });
+    lines = [];
+  };
+
+  for (const line of bodyLines) {
+    const headingMatch = line.match(/^#{1,6}\s+(.+?)\s*$/);
+    if (headingMatch) {
+      flush();
+      heading = headingMatch[1].trim();
+      category = categoryFromHeading(heading);
+    } else {
+      lines.push(line);
+    }
+  }
+  flush();
+  return { headline, sections };
+}
+
+function formatCommitSections(commits, category) {
+  const groups = commits
+    .map(({ headline, sections }) => ({ headline, sections: sections[category] }))
+    .filter(({ sections }) => sections.length > 0);
+  if (groups.length === 0) return "";
+
+  return groups
+    .map(({ headline, sections }) => {
+      const content = sections
+        .map(({ heading, text }) =>
+          heading && shouldPreserveHeading(heading, category)
+            ? "**" + heading + "**\n\n" + text
+            : text,
+        )
+        .join("\n\n");
+      return groups.length > 1 ? "### " + headline + "\n\n" + content : content;
+    })
+    .join("\n\n");
+}
+
+function inlineCode(value) {
+  const quote = String.fromCharCode(96);
+  return quote + String(value).replaceAll(quote, "\\" + quote) + quote;
+}
+
+export function pullRequestBodyFromCommits({
+  branch,
+  defaultBranch,
+  expectedAuthorLogin,
+  reason,
+  commits,
+}) {
+  const parsedCommits = (Array.isArray(commits) ? commits : []).map(parseCommitMessage);
+  if (parsedCommits.length === 0) {
+    parsedCommits.push(parseCommitMessage({ commit: { message: "Changes from " + branch } }, 0));
+  }
+
+  const headlines = parsedCommits.map(({ headline }) => "- " + headline).join("\n");
+  const summaryDetails = formatCommitSections(parsedCommits, "summary");
+  const summary = [headlines, summaryDetails].filter(Boolean).join("\n\n");
+  const problem = formatCommitSections(parsedCommits, "problem");
+  const result = formatCommitSections(parsedCommits, "result");
+  const test = formatCommitSections(parsedCommits, "test");
+  const validationDetails = formatCommitSections(parsedCommits, "validation");
+  const commitLabel = parsedCommits.length === 1 ? "commit" : "commits";
+  const validationFacts = [
+    "- Trust check: " + reason + ".",
+    "- " +
+      parsedCommits.length +
+      " " +
+      commitLabel +
+      " ahead of " +
+      inlineCode(defaultBranch) +
+      ".",
+    "- Existing commit authorship is unchanged.",
+    "- A CODEOWNER review from @" + expectedAuthorLogin + " is required before merge.",
+    "- Decionis Bot cannot push commits, approve reviews, or merge this pull request.",
+  ].join("\n");
+  const validationDetailLimit = prBodySectionLimit - validationFacts.length - 2;
+  const validation = [
+    validationDetails ? boundedSection(validationDetails, "", validationDetailLimit) : "",
+    validationFacts,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  return [
+    "## Summary",
+    "",
+    boundedSection(summary, "Changes from " + inlineCode(branch) + "."),
+    "",
+    "## Problem",
+    "",
+    boundedSection(problem, "No explicit problem statement was provided in the commit messages."),
+    "",
+    "## Result",
+    "",
+    boundedSection(result, "The branch delivers the changes listed in the Summary."),
+    "",
+    "## Test",
+    "",
+    boundedSection(test, "No test details were provided in the commit messages."),
+    "",
+    "## Validation",
+    "",
+    validation,
+  ].join("\n");
 }
 
 export class GitHubApiClient {
@@ -210,7 +387,7 @@ export class PullRequestBot {
         title,
         head: branch,
         base: this.defaultBranch,
-        body: this.buildBody(branch, reason),
+        body: this.buildBody(branch, reason, comparison.commits),
         draft: false,
         maintainer_can_modify: true,
       },
@@ -280,26 +457,14 @@ export class PullRequestBot {
     );
   }
 
-  buildBody(branch, reason) {
-    const quote = String.fromCharCode(96);
-    const safeBranch = branch.replaceAll(quote, "\\" + quote);
-    return [
-      "## Automated pull request",
-      "",
-      "Decionis Bot opened this pull request for " +
-        quote +
-        safeBranch +
-        quote +
-        " because " +
-        reason +
-        ".",
-      "",
-      "- Existing commit authorship is unchanged.",
-      "- The target branch is " + quote + this.defaultBranch + quote + ".",
-      "- A CODEOWNER review from @" + this.expectedAuthorLogin + " is required before merge.",
-      "",
-      "The bot only opens pull requests; it cannot push commits or approve reviews.",
-    ].join("\n");
+  buildBody(branch, reason, commits) {
+    return pullRequestBodyFromCommits({
+      branch,
+      defaultBranch: this.defaultBranch,
+      expectedAuthorLogin: this.expectedAuthorLogin,
+      reason,
+      commits,
+    });
   }
 }
 
