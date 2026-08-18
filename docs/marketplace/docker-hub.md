@@ -79,11 +79,16 @@ Security shape (Hub webhooks carry **no signature**):
   double-fires idempotent (at most one email per release);
 - unsubscribe links carry opaque tokens, never the address.
 
-Setup (owner-owned, after the upstream PR deploys):
+Setup status (2026-08-18):
 
-1. Generate a high-entropy token and set it as `DOCKER_HUB_WEBHOOK_TOKEN`
-   on the control plane; run migration `0132_DockerHubReleases.sql`.
-2. On hub.docker.com, open each repository → **Webhooks** and create one
+1. **Done** — `DOCKER_HUB_WEBHOOK_TOKEN` is set as a GitHub **environment
+   secret** on `decionis/Decionis`'s `production` environment (repo secret
+   slots are exhausted), and the Deploy-to-GKE job forwards it into the api
+   runtime alongside the SendGrid pair (PR #910 @ 1a3abf99). The same value
+   is stashed in the owner's macOS keychain for the Hub-side step:
+   `security find-generic-password -a decionis -s decionis-docker-hub-webhook-token -w`
+2. Pending the #910 merge + deploy (migration `0132` runs in the pipeline):
+   on hub.docker.com, open each repository → **Webhooks** and create one
    webhook per repo pointing at
    `https://api.decionis.com/v1/public/webhooks/docker-hub/<token>`
    (repos: `decionis/desktop-extension`, `decionis/mcp`).
