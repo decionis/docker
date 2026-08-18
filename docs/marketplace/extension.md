@@ -62,9 +62,12 @@ day and verified via the Hub API.
       (feed + dossier inspector), hosted, label added.
 - [ ] Multi-arch image pushed to Docker Hub with provenance/SBOM (extend the
       publish workflow when the Hub repo exists).
-- [ ] Re-run `docker extension validate` — fully green — on submission day.
-- [ ] Submit per Docker's current extension submission process (re-read their
-      contribution guide on submission day; record the PR below).
+- [x] `docker extension validate decionis/desktop-extension:0.1.1` — **fully
+      green** (2026-08-18): all checks pass, including screenshots
+      (SHA-pinned raw URLs) and multi-platform.
+- [ ] Submit via Docker's extension submission form (URL given by the
+      validator itself): https://www.docker.com/products/extensions/submissions/
+      — a Docker web form, owner-owned; record the submission below.
 
 ## Record of submissions
 
