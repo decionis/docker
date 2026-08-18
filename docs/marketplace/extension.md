@@ -50,6 +50,18 @@ cosign keyless; index digest
 Short description and overview (from `extension/overview.md`) set the same
 day and verified via the Hub API.
 
+Later releases (same pipeline, same guarantees):
+
+- 2026-08-18 `ext-v0.1.1` → `:0.1.1` — screenshots label; first fully green
+  `docker extension validate`.
+- 2026-08-18 `ext-v0.1.2` → `:0.1.2` — enrollment-token connect (single-use
+  `dcn_enroll_*` token exchanged by the daemon; org ID + API key demoted to
+  Advanced).
+- 2026-08-18 `ext-v0.1.3` → `:0.1.3` — update banner: the daemon checks the
+  extension's own public Docker Hub tags listing (anonymous, cached 6 h,
+  fail-open — an unreachable listing claims nothing) and the UI shows a
+  dismissible per-version banner with the `docker extension update` command.
+
 ## Before marketplace submission (Rule 1.1 gates)
 
 - [x] Repo public: `https://github.com/decionis/docker` resolves (HTTP 200,

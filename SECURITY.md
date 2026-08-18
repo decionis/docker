@@ -50,4 +50,4 @@ any change to `extension/metadata.json` or `extension/compose.yaml`.
 | Docker Engine socket | **No** | The extension does not mount or use the Engine socket (Rule 4.2). |
 | Host binaries | **No** | None are shipped. |
 | Host filesystem mounts | **No** | None. |
-| Outbound network | Daemon only | HTTPS to the connected org's Decionis control plane and the dossier JWKS URL; certificate verification always on (Rule 2.6). |
+| Outbound network | Daemon only | HTTPS to the connected org's Decionis control plane and the dossier JWKS URL; certificate verification always on (Rule 2.6). Plus one anonymous, credential-free GET of the extension's own public Docker Hub tags listing for the update banner (cached 6 h; carries no identifiers; fail-open — an unreachable listing claims nothing). |

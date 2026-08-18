@@ -91,6 +91,13 @@ export interface DossierPayload {
   payload: Record<string, unknown>;
 }
 
+export interface UpdateInfo {
+  current_version: string;
+  latest_version?: string;
+  update_available: boolean;
+  checked: boolean;
+}
+
 export class BackendError extends Error {
   constructor(
     readonly status: number,
@@ -172,6 +179,10 @@ export class BackendClient {
 
   status(): Promise<DaemonStatus> {
     return this.transport.request("GET", "/api/status") as Promise<DaemonStatus>;
+  }
+
+  update(): Promise<UpdateInfo> {
+    return this.transport.request("GET", "/api/update") as Promise<UpdateInfo>;
   }
 
   connect(

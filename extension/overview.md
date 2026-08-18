@@ -67,7 +67,7 @@ install it directly (Docker Desktop → Settings → Extensions → allow
 non-marketplace extensions):
 
 ```bash
-docker extension install decionis/desktop-extension:0.1.2
+docker extension install decionis/desktop-extension:0.1.3
 ```
 
 Then open the **Decionis** tab, choose **Settings**, and paste a single-use

@@ -24,7 +24,22 @@ import (
 	"github.com/decionis/docker/internal/api"
 	"github.com/decionis/docker/internal/dossier"
 	"github.com/decionis/docker/internal/store"
+	"github.com/decionis/docker/internal/updatecheck"
 )
+
+// extensionRepository is the Docker Hub repository whose public tags listing
+// the update check reads (SECURITY.md documents this outbound destination).
+const extensionRepository = "decionis/desktop-extension"
+
+// Successful update checks are served from cache this long; failed ones
+// retry sooner.
+const (
+	updateCacheTTL      = 6 * time.Hour
+	updateRetryInterval = 15 * time.Minute
+)
+
+// checkUpdate is swapped in tests.
+var checkUpdate = updatecheck.Check
 
 // maxRequestBody bounds every UI request body (rules/security.rules.md 3.3).
 const maxRequestBody = 100 << 10
@@ -75,6 +90,9 @@ type Daemon struct {
 	lastSync   time.Time
 	lastError  string
 	cache      *decisionsCache
+
+	updateResult    *updatecheck.Result
+	updateFetchedAt time.Time
 }
 
 // New builds a daemon. The logger must never receive credentials; nothing in
@@ -113,6 +131,7 @@ func (d *Daemon) LoadStoredConnection() {
 func (d *Daemon) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/version", d.handleVersion)
+	mux.HandleFunc("GET /api/update", d.handleUpdate)
 	mux.HandleFunc("GET /api/status", d.handleStatus)
 	mux.HandleFunc("PUT /api/connection", d.handleConnect)
 	mux.HandleFunc("DELETE /api/connection", d.handleDisconnect)
@@ -186,6 +205,37 @@ func (d *Daemon) statusLocked() statusPayload {
 
 func (d *Daemon) handleVersion(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"version": d.version})
+}
+
+// handleUpdate serves the cached update check (anonymous read of the
+// extension repository's public Docker Hub tags listing). Fail-open but
+// honest: an unreachable listing yields checked=false and claims nothing.
+func (d *Daemon) handleUpdate(w http.ResponseWriter, r *http.Request) {
+	d.mu.Lock()
+	cached := d.updateResult
+	fetchedAt := d.updateFetchedAt
+	d.mu.Unlock()
+
+	if cached != nil {
+		ttl := updateRetryInterval
+		if cached.Checked {
+			ttl = updateCacheTTL
+		}
+		if time.Since(fetchedAt) < ttl {
+			writeJSON(w, http.StatusOK, cached)
+			return
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), upstreamTimeout)
+	defer cancel()
+	result := checkUpdate(ctx, extensionRepository, d.version)
+
+	d.mu.Lock()
+	d.updateResult = &result
+	d.updateFetchedAt = time.Now()
+	d.mu.Unlock()
+	writeJSON(w, http.StatusOK, &result)
 }
 
 func (d *Daemon) handleStatus(w http.ResponseWriter, _ *http.Request) {

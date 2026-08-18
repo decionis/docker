@@ -9,7 +9,18 @@ import { DecisionFeed } from "./features/decisions/DecisionFeed";
 import { SummaryStrip } from "./features/decisions/SummaryStrip";
 import { DossierInspector } from "./features/dossiers/DossierInspector";
 import type { ReportMode } from "./protocol/VerdictLabels";
-import { BackendClient, BackendError, type DaemonStatus, type DecisionsPayload } from "./services/BackendClient";
+import {
+  BackendClient,
+  BackendError,
+  type DaemonStatus,
+  type DecisionsPayload,
+  type UpdateInfo,
+} from "./services/BackendClient";
+import {
+  dismissUpdateVersion,
+  readDismissedVersion,
+  shouldShowUpdateBanner,
+} from "./services/UpdateBanner";
 
 const POLL_INTERVAL_MS = 10_000;
 
@@ -21,6 +32,8 @@ export function App() {
   const [feedError, setFeedError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [inspectedDossierId, setInspectedDossierId] = useState<string | null>(null);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [dismissedUpdate, setDismissedUpdate] = useState<string | null>(() => readDismissedVersion());
   const pollRef = useRef<number | null>(null);
 
   const refreshStatus = useCallback(async () => {
@@ -53,6 +66,13 @@ export function App() {
   }, [refreshStatus]);
 
   useEffect(() => {
+    backend
+      .update()
+      .then(setUpdateInfo)
+      .catch(() => setUpdateInfo(null)); // no banner when the daemon can't say
+  }, [backend]);
+
+  useEffect(() => {
     if (!status?.connected) {
       setDecisions(null);
       return;
@@ -75,6 +95,19 @@ export function App() {
             if (status?.connected) void refreshDecisions();
           }}
         />
+
+        {shouldShowUpdateBanner(updateInfo, dismissedUpdate) && (
+          <Alert
+            severity="info"
+            onClose={() => {
+              dismissUpdateVersion(updateInfo!.latest_version!);
+              setDismissedUpdate(updateInfo!.latest_version!);
+            }}
+          >
+            Version {updateInfo!.latest_version} is available (you have {updateInfo!.current_version}).
+            Update with <code>docker extension update decionis/desktop-extension:{updateInfo!.latest_version}</code>.
+          </Alert>
+        )}
 
         {feedError && <Alert severity="error">{feedError}</Alert>}
 

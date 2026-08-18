@@ -44,7 +44,7 @@ LABEL org.opencontainers.image.title="Decionis" \
     com.docker.extension.publisher-url="https://decionis.com" \
     com.docker.extension.additional-urls="[{\"title\":\"Documentation\",\"url\":\"https://decionis.com/docs/protocol-mcp\"},{\"title\":\"Repository\",\"url\":\"https://github.com/decionis/docker\"}]" \
     com.docker.extension.categories="security" \
-    com.docker.extension.changelog="<p>0.1.2: connect with a single-use enrollment token — no manual org ID or API key. Initial preview: live decision evaluations, decision summary, offline Ed25519 dossier verification, reproducibility posture.</p>"
+    com.docker.extension.changelog="<p>0.1.3: update banner — the extension tells you when a newer version is published. 0.1.2: connect with a single-use enrollment token — no manual org ID or API key. Initial preview: live decision evaluations, decision summary, offline Ed25519 dossier verification, reproducibility posture.</p>"
 
 COPY extension/metadata.json /metadata.json
 COPY extension/icon.svg /icon.svg
