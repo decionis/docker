@@ -34,6 +34,14 @@ checks remain **publish-gated** and fail on any local single-arch build:
 - [ ] Multi-platform image — the publish pipeline pushes
       `linux/amd64,linux/arm64`; local builds are single-arch by design.
 
+## Docker Hub home
+
+The extension's Hub repository is **`decionis/desktop-extension`** — created
+2026-08-18 (public; short description set). The stray `decionis/docker` Hub
+repository (created in error, verified empty: 0 tags, 0 pulls) is pending
+user deletion in the Hub UI; Docker Hub does not support renaming
+repositories.
+
 ## Before marketplace submission (Rule 1.1 gates)
 
 - [x] Repo public: `https://github.com/decionis/docker` resolves (HTTP 200,
