@@ -4,6 +4,7 @@ import {
   GitHubApiClient,
   GitHubApiError,
   PullRequestBot,
+  pullRequestBodyFromCommits,
   titleFromMessage,
 } from "../../scripts/OpenPullRequest.mjs";
 
@@ -197,6 +198,87 @@ describe("titleFromMessage", () => {
     const title = titleFromMessage("x".repeat(80) + "\nbody", "feature/long");
     assert.equal(title.length, 72);
     assert.equal(title.endsWith("..."), true);
+  });
+});
+
+describe("pullRequestBodyFromCommits", () => {
+  it("maps structured commit-message sections into an effective PR body", () => {
+    const body = pullRequestBodyFromCommits({
+      branch: "feature/governed-change",
+      defaultBranch,
+      expectedAuthorLogin,
+      reason: "every commit ahead of master was attributed to @ocularminds",
+      commits: [
+        {
+          commit: {
+            message: [
+              "Add governed deployment",
+              "",
+              "## Problem",
+              "Deployments could bypass a policy verdict.",
+              "",
+              "## Result",
+              "Require an ALLOW verdict before deployment.",
+              "",
+              "## Tests",
+              "- `node --test`",
+              "",
+              "## Validation",
+              "- Verified BLOCK and ALLOW fixtures.",
+            ].join("\n"),
+          },
+        },
+      ],
+    });
+
+    assert.match(body, /## Summary\n\n- Add governed deployment/);
+    assert.match(body, /## Problem\n\n\*\*Problem\*\*[\s\S]*Deployments could bypass/);
+    assert.match(body, /## Result\n\n\*\*Result\*\*[\s\S]*Require an ALLOW verdict/);
+    assert.match(body, /## Test\n\n\*\*Tests\*\*[\s\S]*node --test/);
+    assert.match(body, /## Validation[\s\S]*Verified BLOCK and ALLOW fixtures/);
+    assert.match(body, /Trust check: every commit ahead of master/);
+  });
+
+  it("uses commit headlines and explicit fallbacks for unstructured messages", () => {
+    const body = pullRequestBodyFromCommits({
+      branch: "feature/two-commits",
+      defaultBranch,
+      expectedAuthorLogin,
+      reason: "branch creation was attributed to @ocularminds",
+      commits: [
+        { commit: { message: "Add the first change" } },
+        { commit: { message: "Fix the second change" } },
+      ],
+    });
+
+    assert.match(body, /- Add the first change\n- Fix the second change/);
+    assert.match(body, /No explicit problem statement was provided/);
+    assert.match(body, /No test details were provided/);
+    assert.match(body, /2 commits ahead of `master`/);
+  });
+
+  it("maps What & why and Verification headings and bounds long sections", () => {
+    const body = pullRequestBodyFromCommits({
+      branch: "feature/large-message",
+      defaultBranch,
+      expectedAuthorLogin,
+      reason: "branch creation was attributed to @ocularminds",
+      commits: [
+        {
+          commit: {
+            message:
+              "Ship the image\n\n## What & why\n" +
+              "x".repeat(9 * 1024) +
+              "\n\n## Verification\nSmoke test passed.",
+          },
+        },
+      ],
+    });
+
+    assert.match(body, /## Result[\s\S]*What & why/);
+    assert.match(body, /Content truncated by Decionis Bot/);
+    assert.match(body, /## Test[\s\S]*Verification[\s\S]*Smoke test passed/);
+    assert.ok(body.length < 40 * 1024);
   });
 });
 

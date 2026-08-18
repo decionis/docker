@@ -35,6 +35,25 @@ from the trusted default branch before the narrowly scoped App token is minted.
 A scheduled scan covers branches that were created before the workflow existed
 or received commits after creation.
 
+## Pull request content
+
+The bot derives the pull-request title and body from the commits ahead of
+`master`. Commit subjects become the Summary, while Markdown sections named
+`Problem`, `Why`, `Context`, `Changes`, `Result`, `Tests`, `Verification`, or
+`Validation` are routed into these stable pull-request sections:
+
+- Summary
+- Problem
+- Result
+- Test
+- Validation
+
+Unrecognized commit-message sections are included under Result. When a commit
+does not provide a problem statement or test details, the pull request says so
+explicitly instead of inventing them. Validation always records the branch
+trust decision, commit count, unchanged authorship, and required CODEOWNER
+review. Each generated section is bounded before the pull request is created.
+
 ## GitHub App configuration
 
 Create an organization-owned GitHub App named **Decionis Bot** with:
