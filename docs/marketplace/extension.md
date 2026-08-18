@@ -31,16 +31,24 @@ checks remain **publish-gated** and fail on any local single-arch build:
       `docs/screenshots/` and reference their `raw.githubusercontent.com`
       URLs once the repo is public; the validator live-checks them
       (Rule 1.1 enforced by Docker's own tooling).
-- [ ] Multi-platform image — the publish pipeline pushes
-      `linux/amd64,linux/arm64`; local builds are single-arch by design.
+- [x] Multi-platform image — `extension-publish.yml` pushed
+      `linux/amd64,linux/arm64` on 2026-08-18; `docker extension validate`
+      against the published `0.1.0` now passes the multiplatform check.
+      Screenshots are the single remaining validate item.
 
 ## Docker Hub home
 
 The extension's Hub repository is **`decionis/desktop-extension`** — created
-2026-08-18 (public; short description set). The stray `decionis/docker` Hub
-repository (created in error, verified empty: 0 tags, 0 pulls) is pending
-user deletion in the Hub UI; Docker Hub does not support renaming
-repositories.
+2026-08-18 (public). The stray `decionis/docker` Hub repository was deleted
+by the owner the same day (Docker Hub does not support renaming
+repositories).
+
+First release, 2026-08-18: `ext-v0.1.0` → `decionis/desktop-extension:0.1.0`
++ `:latest`, multi-arch (linux/amd64 + linux/arm64), provenance + SBOM,
+cosign keyless; index digest
+`sha256:8894ebb49feb49ceac4f07ab2c624789bc11ca8b2ebce846df7b414828dfa563`.
+Short description and overview (from `extension/overview.md`) set the same
+day and verified via the Hub API.
 
 ## Before marketplace submission (Rule 1.1 gates)
 
