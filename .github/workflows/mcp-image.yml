@@ -1,0 +1,53 @@
+# Build and verify the decionis/mcp image on every change to mcp-server/.
+# Verification = hadolint, a full stdio smoke test against the built image
+# (handshake, exact tool inventory, evaluate round-trip — the drift gate of
+# rules/discovery.rules.md Rule 1.4), and a blocking vulnerability scan
+# (rules/security.rules.md Rule 1.6). Publishing is a separate, tag-driven
+# workflow (mcp-publish.yml).
+# Actions pinned to commit SHAs per rules/security.rules.md Rule 1.5
+# (SHA sweep 2026-08-18).
+name: mcp-image
+
+on:
+  pull_request:
+    paths:
+      - "mcp-server/**"
+      - ".github/workflows/mcp-image.yml"
+  push:
+    branches: [master]
+    paths:
+      - "mcp-server/**"
+      - ".github/workflows/mcp-image.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: hadolint
+        uses: hadolint/hadolint-action@2a66e89f53d0771bb131a7fa31f3136336094aa6 # v3.4.0
+        with:
+          dockerfile: mcp-server/Dockerfile
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - name: Build image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: mcp-server
+          load: true
+          push: false
+          tags: decionis/mcp:ci
+      - name: Smoke test (stdio handshake, tool inventory, evaluate)
+        run: bash mcp-server/test/smoke.sh decionis/mcp:ci
+      - name: Vulnerability scan (release gate)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: decionis/mcp:ci
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+          # Unfixed upstream CVEs are a standing, documented risk-acceptance
+          # (rules/security.rules.md Rule 1.6): no fix exists to upgrade to.
+          ignore-unfixed: true
