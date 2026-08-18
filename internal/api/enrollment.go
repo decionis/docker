@@ -35,12 +35,9 @@ var (
 // (POST /connectors/enrollments/exchange) — the same mechanism Decionis
 // connectors use to self-provision credentials.
 func ExchangeEnrollment(ctx context.Context, baseURL, enrollmentToken string) (*EnrollmentExchange, error) {
-	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
-	if baseURL == "" {
-		baseURL = DefaultBaseURL
-	}
-	if !strings.HasPrefix(baseURL, "https://") && !localhostHost(baseURL) {
-		return nil, errors.New("base URL must use https")
+	normalizedBaseURL, err := ValidateBaseURL(baseURL)
+	if err != nil {
+		return nil, err
 	}
 	if len(strings.TrimSpace(enrollmentToken)) < 20 {
 		return nil, ErrEnrollmentInvalid
@@ -51,7 +48,7 @@ func ExchangeEnrollment(ctx context.Context, baseURL, enrollmentToken string) (*
 		return nil, errors.New("decionis api: enrollment exchange: encode failed")
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		baseURL+"/connectors/enrollments/exchange", bytes.NewReader(payload))
+		normalizedBaseURL+"/connectors/enrollments/exchange", bytes.NewReader(payload))
 	if err != nil {
 		return nil, errors.New("decionis api: enrollment exchange: build request failed")
 	}

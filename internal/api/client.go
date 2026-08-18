@@ -76,16 +76,11 @@ func localhostHost(rawURL string) bool {
 // NewClient validates the connection config. HTTPS is mandatory except for
 // localhost (development and tests) — rules/security.rules.md Rule 2.6.
 func NewClient(config Config) (*Client, error) {
-	config.BaseURL = strings.TrimRight(strings.TrimSpace(config.BaseURL), "/")
-	if config.BaseURL == "" {
-		config.BaseURL = DefaultBaseURL
+	normalizedBaseURL, err := ValidateBaseURL(config.BaseURL)
+	if err != nil {
+		return nil, err
 	}
-	if !strings.HasPrefix(config.BaseURL, "https://") && !localhostHost(config.BaseURL) {
-		return nil, errors.New("base URL must use https")
-	}
-	if parsed, err := url.Parse(config.BaseURL); err != nil || parsed.User != nil {
-		return nil, errors.New("base URL must be a plain origin without credentials")
-	}
+	config.BaseURL = normalizedBaseURL
 	if strings.TrimSpace(config.OrgID) == "" {
 		return nil, errors.New("org id is required")
 	}

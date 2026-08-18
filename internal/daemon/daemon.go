@@ -288,10 +288,18 @@ func (d *Daemon) handleConnect(w http.ResponseWriter, r *http.Request) {
 // discarding them on a transient probe failure would strand the user. The
 // follow-up probe only sets status.
 func (d *Daemon) connectViaEnrollment(w http.ResponseWriter, r *http.Request, request connectRequest) {
+	// The base URL is user input; it passes the transport-policy gate here at
+	// the boundary and only the normalized result reaches the network layer.
+	baseURL, err := api.ValidateBaseURL(request.BaseURL)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), upstreamTimeout)
 	defer cancel()
 
-	exchange, err := exchangeEnrollment(ctx, request.BaseURL, request.EnrollmentToken)
+	exchange, err := exchangeEnrollment(ctx, baseURL, request.EnrollmentToken)
 	if err != nil {
 		switch {
 		case errors.Is(err, api.ErrEnrollmentInvalid):
@@ -307,10 +315,7 @@ func (d *Daemon) connectViaEnrollment(w http.ResponseWriter, r *http.Request, re
 		return
 	}
 
-	connection := store.Connection{BaseURL: strings.TrimRight(strings.TrimSpace(request.BaseURL), "/"), OrgID: exchange.OrgID}
-	if connection.BaseURL == "" {
-		connection.BaseURL = api.DefaultBaseURL
-	}
+	connection := store.Connection{BaseURL: baseURL, OrgID: exchange.OrgID}
 	if err := d.store.Save(connection, exchange.RawKey); err != nil {
 		d.logger.Error("connection save failed", "detail", "storage error")
 		writeError(w, http.StatusInternalServerError, "storage_failed", "The minted credentials could not be stored.")
