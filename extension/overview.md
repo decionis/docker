@@ -1,7 +1,8 @@
 <!--
   Docker Hub overview for decionis/desktop-extension — this committed file is
   the source of truth (rules/discovery.rules.md Rule 2.1); paste/push to Hub
-  on every release, never edit only in the Hub UI.
+  on every release, never edit only in the Hub UI. The narrative section was
+  authored by the owner on Hub (2026-08-18) and folded back in here.
 
   Link sweep 2026-08-18:
     - https://decionis.com/docs/protocol-mcp -> HTTP 200
@@ -12,9 +13,41 @@
 
 # Decionis — execution authority for AI agents, inside Docker Desktop
 
-Decionis evaluates consequential agent actions against deterministic,
-versioned policy **before** execution. This Docker Desktop extension connects
-to your Decionis org and makes that authority visible where you work:
+Decionis adds an execution-authority layer to Docker-based AI and automation
+workflows.
+
+Before a consequential action proceeds, Decionis evaluates it against
+deterministic policy and returns an explicit outcome such as PROCEED, HOLD,
+or BLOCK.
+
+Use Decionis with containerized AI agents, MCP servers, CI/CD workflows,
+developer tools, and automated services that need clear execution boundaries.
+
+When policy requires human authority, Decionis Presence can request verified
+approval before execution continues.
+
+Every governed decision can produce a signed Decision Dossier containing the
+policy version, reason codes, evaluation context, evidence hash, and
+cryptographic signature.
+
+Typical use cases include:
+
+- AI agent and MCP tool governance
+- production deployment approval
+- infrastructure changes
+- database mutations
+- package publishing
+- CI/CD execution controls
+- privileged developer operations
+- autonomous workflow governance
+
+Decionis does not execute downstream actions. It evaluates whether an action
+is authorized to proceed; the connected agent, tool, or system remains
+responsible for execution.
+
+**Your agents have tools. Decionis provides the authority boundary.**
+
+## What the extension shows
 
 - **Live decision evaluations** — outcomes `APPROVE / ESCALATE / REJECT /
   REVIEW` with the policy version, execution action, and reason behind each
