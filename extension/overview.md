@@ -59,6 +59,9 @@ responsible for execution.
 - **Credential custody done right** — the org API key is held by the
   extension's backend only, never the UI, and the extension mounts no Docker
   Engine socket, no host paths, and ships no host binaries.
+- **Knows when it's stale** — the extension checks its own public Docker Hub
+  tags listing (anonymously) and shows a dismissible banner when a newer
+  version is published.
 
 ## Install
 
