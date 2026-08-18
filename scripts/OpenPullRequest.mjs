@@ -51,8 +51,12 @@ function boundedSection(value, fallback) {
   );
 }
 
+function normalizedHeading(heading) {
+  return heading.toLowerCase().replace(/[`*_]/g, "").trim();
+}
+
 function categoryFromHeading(heading) {
-  const normalized = heading.toLowerCase().replace(/[`*_]/g, "").trim();
+  const normalized = normalizedHeading(heading);
   if (/\b(test plan|tests?|testing|verification|checks?|qa)\b/.test(normalized)) {
     return "test";
   }
@@ -70,6 +74,18 @@ function categoryFromHeading(heading) {
   }
   if (/\b(summary|overview)\b/.test(normalized)) return "summary";
   return "result";
+}
+
+function shouldPreserveHeading(heading, category) {
+  const normalized = normalizedHeading(heading);
+  const canonicalHeadings = {
+    summary: ["summary"],
+    problem: ["problem"],
+    result: ["result"],
+    test: ["test", "tests", "testing"],
+    validation: ["validation"],
+  };
+  return !canonicalHeadings[category].includes(normalized);
 }
 
 function parseCommitMessage(commit, index) {
@@ -110,7 +126,11 @@ function formatCommitSections(commits, category) {
   return groups
     .map(({ headline, sections }) => {
       const content = sections
-        .map(({ heading, text }) => (heading ? "**" + heading + "**\n\n" + text : text))
+        .map(({ heading, text }) =>
+          heading && shouldPreserveHeading(heading, category)
+            ? "**" + heading + "**\n\n" + text
+            : text,
+        )
         .join("\n\n");
       return groups.length > 1 ? "### " + headline + "\n\n" + content : content;
     })

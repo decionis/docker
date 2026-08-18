@@ -232,9 +232,10 @@ describe("pullRequestBodyFromCommits", () => {
     });
 
     assert.match(body, /## Summary\n\n- Add governed deployment/);
-    assert.match(body, /## Problem\n\n\*\*Problem\*\*[\s\S]*Deployments could bypass/);
-    assert.match(body, /## Result\n\n\*\*Result\*\*[\s\S]*Require an ALLOW verdict/);
-    assert.match(body, /## Test\n\n\*\*Tests\*\*[\s\S]*node --test/);
+    assert.match(body, /## Problem\n\nDeployments could bypass/);
+    assert.match(body, /## Result\n\nRequire an ALLOW verdict/);
+    assert.match(body, /## Test\n\n- `node --test`/);
+    assert.doesNotMatch(body, /\*\*(Problem|Result|Tests|Validation)\*\*/);
     assert.match(body, /## Validation[\s\S]*Verified BLOCK and ALLOW fixtures/);
     assert.match(body, /Trust check: every commit ahead of master/);
   });
