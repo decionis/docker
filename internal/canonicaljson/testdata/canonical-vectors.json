@@ -1,0 +1,58 @@
+[
+  {
+    "input": "{}",
+    "expected": "{}"
+  },
+  {
+    "input": "[]",
+    "expected": "[]"
+  },
+  {
+    "input": "null",
+    "expected": "null"
+  },
+  {
+    "input": "true",
+    "expected": "true"
+  },
+  {
+    "input": "\"plain\"",
+    "expected": "\"plain\""
+  },
+  {
+    "input": "{\"b\":1,\"a\":2}",
+    "expected": "{\"a\":2,\"b\":1}"
+  },
+  {
+    "input": "{\"z\":{\"y\":[3,2,{\"c\":null,\"b\":false}],\"x\":\"s\"},\"a\":[{\"n\":2,\"m\":1}]}",
+    "expected": "{\"a\":[{\"m\":1,\"n\":2}],\"z\":{\"x\":\"s\",\"y\":[3,2,{\"b\":false,\"c\":null}]}}"
+  },
+  {
+    "input": "{\"text\":\"quote \\\" backslash \\\\ slash / angle <tag> & amp\"}",
+    "expected": "{\"text\":\"quote \\\" backslash \\\\ slash / angle <tag> & amp\"}"
+  },
+  {
+    "input": "{\"controls\":\"bell\\u0007 backspace\\b formfeed\\f newline\\n return\\r tab\\t unit\\u001f\"}",
+    "expected": "{\"controls\":\"bell\\u0007 backspace\\b formfeed\\f newline\\n return\\r tab\\t unit\\u001f\"}"
+  },
+  {
+    "input": "{\"separators\":\"line\\u2028para\\u2029end\"}",
+    "expected": "{\"separators\":\"line para end\"}"
+  },
+  {
+    "input": "{\"unicode\":\"héllo wörld — ✓ 日本語 🎯\"}",
+    "expected": "{\"unicode\":\"héllo wörld — ✓ 日本語 🎯\"}"
+  },
+  {
+    "input": "{\"numbers\":[0,1,-1,42,9007199254740991,0.1,1.5,-2.75,1e+21,1e-7,3.141592653589793]}",
+    "expected": "{\"numbers\":[0,1,-1,42,9007199254740991,0.1,1.5,-2.75,1e+21,1e-7,3.141592653589793]}"
+  },
+  {
+    "input": "{\"empty_string\":\"\",\"empty_obj\":{},\"empty_arr\":[]}",
+    "expected": "{\"empty_arr\":[],\"empty_obj\":{},\"empty_string\":\"\"}"
+  },
+  {
+    "input": "{\"a\":\"same\",\"A\":\"case\",\"_a\":\"underscore\",\"0\":\"digit\"}",
+    "expected": "{\"0\":\"digit\",\"A\":\"case\",\"_a\":\"underscore\",\"a\":\"same\"}"
+  }
+]

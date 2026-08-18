@@ -38,5 +38,16 @@ The load-bearing ones:
 ## Docker Desktop extension privileges
 
 Per `rules/security.rules.md` Rule 4.1, every privilege the extension
-requests must be enumerated and justified here. The extension has not shipped
-yet; the pull request that lands it must populate this section.
+requests is enumerated and justified here, and this list is re-reviewed on
+any change to `extension/metadata.json` or `extension/compose.yaml`.
+
+| Privilege | Requested | Justification |
+| --------- | --------- | ------------- |
+| Backend VM service (`vm.composefile`) | Yes | The Go daemon (`decionis-daemon`) holds the org API key, calls the published hosted API, and verifies dossiers. Credentials must live in the backend, never the UI (Rules 2.2–2.3). |
+| Extension socket (`vm.exposes.socket`) | Yes | The only channel between the UI and the daemon. Every request over it is schema-validated with a 100 KB bound (Rule 4.4). |
+| Private named volume (`decionis-data:/data`) | Yes | Connection settings and the org API key at rest, `0600` inside the backend's private volume (Rule 2.5). No host paths are mounted. |
+| Root user inside the extension VM container | Yes (today) | Required to bind `/run/guest-services/backend.sock`. Revisit for a non-root bind once verified against current Docker Desktop. |
+| Docker Engine socket | **No** | The extension does not mount or use the Engine socket (Rule 4.2). |
+| Host binaries | **No** | None are shipped. |
+| Host filesystem mounts | **No** | None. |
+| Outbound network | Daemon only | HTTPS to the connected org's Decionis control plane and the dossier JWKS URL; certificate verification always on (Rule 2.6). |

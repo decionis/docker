@@ -1,0 +1,16 @@
+{
+  "icon": "icon.svg",
+  "vm": {
+    "composefile": "compose.yaml",
+    "exposes": {
+      "socket": "backend.sock"
+    }
+  },
+  "ui": {
+    "dashboard-tab": {
+      "title": "Decionis",
+      "src": "index.html",
+      "root": "ui"
+    }
+  }
+}

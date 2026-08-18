@@ -1,0 +1,13 @@
+# Extension VM service: the Decionis Docker daemon serving the UI over the
+# extension socket. /data is the daemon's private volume for connection state
+# (rules/security.rules.md Rule 2.5); no host mounts, no engine socket
+# (Rule 4.2).
+services:
+  decionis-daemon:
+    image: ${DESKTOP_PLUGIN_IMAGE}
+    restart: always
+    entrypoint: ["/backend", "-socket", "/run/guest-services/backend.sock", "-data", "/data"]
+    volumes:
+      - decionis-data:/data
+volumes:
+  decionis-data:

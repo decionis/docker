@@ -1,0 +1,4 @@
+{
+  "canonical_document": "{\"amounts\":[0.1,1e+21,9007199254740991],\"decision_id\":\"0b6f8a3e-6f2a-4c3e-9b1d-2f4a5b6c7d8e\",\"decision_type\":\"production-deploy\",\"edge_cases\":{\"backspace\":\"c\\bd\",\"formfeed\":\"a\\fb\",\"html\":\"<a>&</a>\",\"separators\":\"x y z\"},\"evaluated\":{\"matched\":1,\"rules\":4},\"outcome\":\"ESCALATE\",\"reason\":\"Human authorization required for production infrastructure changes.\"}",
+  "document_sha256": "96f61ee385aceda9964365c031559c9d366b09fb97d203404b2f75cf4c8c05b1"
+}
