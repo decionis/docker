@@ -3,7 +3,7 @@
 <!-- Badge sweep 2026-08-18: every URL below verified HTTP 200 (rules/discovery.rules.md Rule 1.1).
      Coverage populates on the first master CI run after the codecov upload step landed. -->
 
-[![CI](https://github.com/decionis/docker/actions/workflows/ci.yml/badge.svg)](https://github.com/decionis/docker/actions/workflows/ci.yml)
+[![CI](https://github.com/decionis/docker/actions/workflows/decionis.yml/badge.svg)](https://github.com/decionis/docker/actions/workflows/decionis.yml)
 [![License](https://img.shields.io/github/license/decionis/docker)](https://github.com/decionis/docker/blob/master/LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/decionis/docker)](https://goreportcard.com/report/github.com/decionis/docker)
 [![Coverage](https://codecov.io/gh/decionis/docker/graph/badge.svg)](https://codecov.io/gh/decionis/docker)

@@ -1,7 +1,7 @@
 # Continuous integration for the Go module (daemon, CLI, proxy, helper).
 # Actions are pinned to commit SHAs per rules/security.rules.md Rule 1.5;
 # the trailing comment records the audited tag (SHA sweep 2026-08-18).
-name: ci
+name: decionis
 
 on:
   push:
