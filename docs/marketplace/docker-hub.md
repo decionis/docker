@@ -58,3 +58,38 @@ custody, orderings, and every user-owned manual step live here.
 | Date | Tag | Digest | Notes |
 | ---- | --- | ------ | ----- |
 | 2026-08-18 | `mcp-v0.1.2` → `decionis/mcp:0.1.2` + `:latest` | `sha256:494710a805399eafedf2c2e77b75249835afd0c159a26ef02f58911561135a44` | First publish. Multi-arch (linux/amd64 + linux/arm64), provenance + SBOM attestations, cosign keyless signature (created in CI; verify locally with the cosign command above once cosign is installed). Full smoke suite re-run green against the published image. Overview paste into the Hub description still pending (user-owned). |
+
+## Webhooks (release announcements)
+
+Docker Hub can call a webhook whenever a tag is pushed to a repository. The
+Decionis control plane ships a receiver (upstream PR decionis/Decionis#910,
+`POST /v1/public/webhooks/docker-hub/:token`) that turns a verified release
+tag on `decionis/desktop-extension` into one announcement email per
+connected workspace owner (consumed docker-desktop enrollment, minus
+opt-outs); pushes to `decionis/mcp` are recorded but never emailed.
+
+Security shape (Hub webhooks carry **no signature**):
+
+- the URL's final segment is a secret (`DOCKER_HUB_WEBHOOK_TOKEN` on the
+  control plane; unset disables the endpoint, wrong token answers 404);
+- the payload is treated as a hint only — the tag is re-verified against
+  Docker Hub's public tags API before anything announces;
+- the payload's `callback_url` is never followed;
+- a unique `(repo, tag)` claim makes Hub's retries and multi-arch
+  double-fires idempotent (at most one email per release);
+- unsubscribe links carry opaque tokens, never the address.
+
+Setup (owner-owned, after the upstream PR deploys):
+
+1. Generate a high-entropy token and set it as `DOCKER_HUB_WEBHOOK_TOKEN`
+   on the control plane; run migration `0132_DockerHubReleases.sql`.
+2. On hub.docker.com, open each repository → **Webhooks** and create one
+   webhook per repo pointing at
+   `https://api.decionis.com/v1/public/webhooks/docker-hub/<token>`
+   (repos: `decionis/desktop-extension`, `decionis/mcp`).
+3. Verify: push the next release tag and check the webhook's delivery
+   history on Hub (expect HTTP 200) and the
+   `docker_hub_release_announcements` row (recipient count).
+
+The in-product update banner (extension ≥ 0.1.3) works independently of
+this: it needs no webhook, no credentials, and no deploy.
