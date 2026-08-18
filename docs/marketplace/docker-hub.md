@@ -14,12 +14,14 @@ custody, orderings, and every user-owned manual step live here.
 
 ## Preconditions for the FIRST publish (Rule 1.1 gate)
 
-- [ ] `https://github.com/decionis/docker` is public — the overview and the
-      image's `org.opencontainers.image.source` label reference it. Sweep
-      2026-08-18: still 404 (repo not public yet). **Blocking.**
-- [ ] Docker Hub repo `decionis/mcp` created under the org.
-- [ ] Every URL in `mcp-server/overview.md` re-verified live on publish day;
-      update the sweep comment at the top of that file.
+- [x] `https://github.com/decionis/docker` is public — verified HTTP 200 on
+      the 2026-08-18 publish-day sweep.
+- [x] Docker Hub repo `decionis/mcp` created under the org (Hub API 200,
+      2026-08-18).
+- [x] `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` repo secrets present
+      (verified via `gh secret list`, 2026-08-18).
+- [x] Every URL in `mcp-server/overview.md` re-verified live on publish day
+      (2026-08-18); sweep comment updated.
 
 ## Versioning
 

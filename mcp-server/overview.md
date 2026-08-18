@@ -3,14 +3,12 @@
   truth (rules/discovery.rules.md Rule 2.1); paste/push to Hub on every
   release, never edit only in the Hub UI.
 
-  Link sweep 2026-08-18:
+  Link sweep 2026-08-18 (publish-day re-sweep, same day):
     - https://decionis.com/docs/protocol-mcp -> HTTP 200
     - https://www.npmjs.com/package/@decionis/mcp -> verified via npm registry
       API (`npm view @decionis/mcp`; npmjs.com returns 403 to non-browser
       fetches)
-    - https://github.com/decionis/docker -> PENDING: repo not public yet.
-      MUST resolve before this overview is pushed to Hub (Rule 1.1) — see
-      docs/marketplace/docker-hub.md publish checklist.
+    - https://github.com/decionis/docker -> HTTP 200 (repo now public)
 -->
 
 # decionis/mcp — Decionis execution authority, local MCP evaluator

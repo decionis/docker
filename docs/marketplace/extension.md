@@ -36,9 +36,8 @@ checks remain **publish-gated** and fail on any local single-arch build:
 
 ## Before marketplace submission (Rule 1.1 gates)
 
-- [ ] Repo public: `https://github.com/decionis/docker` resolves (also
-      re-add it to `com.docker.extension.additional-urls` — it was removed
-      because the validator correctly flagged the 404).
+- [x] Repo public: `https://github.com/decionis/docker` resolves (HTTP 200,
+      2026-08-18) and is restored in `com.docker.extension.additional-urls`.
 - [ ] Icon: `com.docker.desktop.extension.icon` currently points at the only
       verified hosted asset (`https://decionis.com/favicon.ico`). Host the
       512×512 `extension/decionis-logo.png` at a public decionis.com URL and
