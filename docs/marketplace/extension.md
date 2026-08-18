@@ -73,3 +73,4 @@ day and verified via the Hub API.
 
 | Date | PR | Status | Notes |
 | ---- | -- | ------ | ----- |
+| 2026-08-18 | https://github.com/docker/extensions-submissions/issues/257 | Submitted; **blocked by Docker's own pipeline** | Owner submitted via the web form. TOS accepted, issue parsed; the `validate` job fails at *Set up job* because the workflow's transitive actions (`mavrosxristoforos/get-xml-info@1.1.1`, `actions/cache@v3`) violate the repo's SHA-pinning policy — every submission since at least 2026-07-22 fails identically (#248, #255). Diagnosis commented on the issue (2026-08-18); the workflow supports revalidation via comment once Docker fixes the pins. Our side is clean: `docker extension validate` fully green on 0.1.1. |
