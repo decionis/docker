@@ -7,21 +7,25 @@ ARG NODE_BASE=node:24-alpine@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31
 ARG GO_BASE=golang:1.26-alpine@sha256:3889b425f035be855a72fb4755265311293b6d414521f0a519d819df32222d83
 ARG ALPINE_BASE=alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce
 
-FROM ${NODE_BASE} AS ui-build
+# Build stages run on the build platform (no QEMU): the UI output is
+# platform-independent and the Go daemon cross-compiles via TARGETOS/TARGETARCH.
+FROM --platform=${BUILDPLATFORM} ${NODE_BASE} AS ui-build
 WORKDIR /ui
 COPY extension/ui/package.json extension/ui/package-lock.json ./
 RUN npm ci --ignore-scripts
 COPY extension/ui/ ./
 RUN npm run build
 
-FROM ${GO_BASE} AS daemon-build
+FROM --platform=${BUILDPLATFORM} ${GO_BASE} AS daemon-build
 WORKDIR /src
 COPY go.mod ./
 RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
 ARG IMAGE_VERSION=dev
-RUN CGO_ENABLED=0 go build -trimpath \
+ARG TARGETOS
+ARG TARGETARCH
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath \
     -ldflags "-s -w -X github.com/decionis/docker/internal/version.Version=${IMAGE_VERSION}" \
     -o /backend ./cmd/decionis-daemon
 
