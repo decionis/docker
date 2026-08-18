@@ -42,13 +42,11 @@ function boundedHeadline(value, fallback) {
     : headline.slice(0, commitHeadlineLimit - 3).trimEnd() + "...";
 }
 
-function boundedSection(value, fallback) {
+function boundedSection(value, fallback, limit = prBodySectionLimit) {
   const section = normalizeMarkdown(value) || fallback;
-  if (section.length <= prBodySectionLimit) return section;
-  return (
-    section.slice(0, prBodySectionLimit - 40).trimEnd() +
-    "\n\n_Content truncated by Decionis Bot._"
-  );
+  if (section.length <= limit) return section;
+  const suffix = "\n\n_Content truncated by Decionis Bot._";
+  return section.slice(0, Math.max(0, limit - suffix.length)).trimEnd() + suffix;
 }
 
 function normalizedHeading(heading) {
@@ -175,6 +173,13 @@ export function pullRequestBodyFromCommits({
     "- A CODEOWNER review from @" + expectedAuthorLogin + " is required before merge.",
     "- Decionis Bot cannot push commits, approve reviews, or merge this pull request.",
   ].join("\n");
+  const validationDetailLimit = prBodySectionLimit - validationFacts.length - 2;
+  const validation = [
+    validationDetails ? boundedSection(validationDetails, "", validationDetailLimit) : "",
+    validationFacts,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   return [
     "## Summary",
@@ -195,7 +200,7 @@ export function pullRequestBodyFromCommits({
     "",
     "## Validation",
     "",
-    boundedSection([validationDetails, validationFacts].filter(Boolean).join("\n\n"), validationFacts),
+    validation,
   ].join("\n");
 }
 

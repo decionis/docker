@@ -270,7 +270,9 @@ describe("pullRequestBodyFromCommits", () => {
             message:
               "Ship the image\n\n## What & why\n" +
               "x".repeat(9 * 1024) +
-              "\n\n## Verification\nSmoke test passed.",
+              "\n\n## Verification\nSmoke test passed." +
+              "\n\n## Validation\n" +
+              "y".repeat(9 * 1024),
           },
         },
       ],
@@ -279,6 +281,7 @@ describe("pullRequestBodyFromCommits", () => {
     assert.match(body, /## Result[\s\S]*What & why/);
     assert.match(body, /Content truncated by Decionis Bot/);
     assert.match(body, /## Test[\s\S]*Verification[\s\S]*Smoke test passed/);
+    assert.match(body, /## Validation[\s\S]*Trust check: branch creation was attributed/);
     assert.ok(body.length < 40 * 1024);
   });
 });
