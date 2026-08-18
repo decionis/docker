@@ -1,4 +1,4 @@
-export const defaultMaxJsonResponseBytes = 100 * 1024;
+export const defaultMaxJsonResponseBytes = 256 * 1024;
 
 export async function readBoundedJsonResponse(
   response,
