@@ -174,7 +174,11 @@ export class BackendClient {
     return this.transport.request("GET", "/api/status") as Promise<DaemonStatus>;
   }
 
-  connect(input: { base_url?: string; org_id: string; api_key: string }): Promise<DaemonStatus> {
+  connect(
+    input:
+      | { enrollment_token: string; base_url?: string }
+      | { org_id: string; api_key: string; base_url?: string },
+  ): Promise<DaemonStatus> {
     return this.transport.request("PUT", "/api/connection", input) as Promise<DaemonStatus>;
   }
 

@@ -198,7 +198,14 @@ type connectRequest struct {
 	BaseURL string `json:"base_url"`
 	OrgID   string `json:"org_id"`
 	APIKey  string `json:"api_key"`
+	// EnrollmentToken is the one-paste alternative: a single-use
+	// dcn_enroll_* token exchanged at the control plane for the org id and a
+	// freshly minted scoped key (the connector self-provisioning mechanism).
+	EnrollmentToken string `json:"enrollment_token"`
 }
+
+// exchangeEnrollment is swapped in tests.
+var exchangeEnrollment = api.ExchangeEnrollment
 
 func (d *Daemon) handleConnect(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
@@ -212,6 +219,14 @@ func (d *Daemon) handleConnect(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeError(w, http.StatusBadRequest, "invalid_request", "Body must be JSON with base_url, org_id, api_key.")
+		return
+	}
+	if strings.TrimSpace(request.EnrollmentToken) != "" {
+		if strings.TrimSpace(request.OrgID) != "" || strings.TrimSpace(request.APIKey) != "" {
+			writeError(w, http.StatusBadRequest, "invalid_request", "Provide either enrollment_token or org_id + api_key, not both.")
+			return
+		}
+		d.connectViaEnrollment(w, r, request)
 		return
 	}
 	if !uuidPattern.MatchString(strings.TrimSpace(request.OrgID)) {
@@ -262,6 +277,79 @@ func (d *Daemon) handleConnect(w http.ResponseWriter, r *http.Request) {
 	status := d.statusLocked()
 	d.mu.Unlock()
 	d.logger.Info("connected", "base_url", connection.BaseURL, "org_id", connection.OrgID)
+	writeJSON(w, http.StatusOK, status)
+}
+
+// connectViaEnrollment redeems a single-use enrollment token: the control
+// plane returns the org id and a freshly minted scoped key (the same
+// self-provisioning mechanism Decionis connectors use). Unlike the manual
+// path, credentials are stored as soon as the exchange succeeds — they are
+// server-minted (no typo risk) and the token is consumed by the exchange, so
+// discarding them on a transient probe failure would strand the user. The
+// follow-up probe only sets status.
+func (d *Daemon) connectViaEnrollment(w http.ResponseWriter, r *http.Request, request connectRequest) {
+	ctx, cancel := context.WithTimeout(r.Context(), upstreamTimeout)
+	defer cancel()
+
+	exchange, err := exchangeEnrollment(ctx, request.BaseURL, request.EnrollmentToken)
+	if err != nil {
+		switch {
+		case errors.Is(err, api.ErrEnrollmentInvalid):
+			d.logger.Info("enrollment exchange rejected")
+			writeError(w, http.StatusUnauthorized, "enrollment_invalid", "The enrollment token is invalid or expired.")
+		case errors.Is(err, api.ErrEnrollmentUsed):
+			writeError(w, http.StatusConflict, "enrollment_used", "This enrollment token has already been exchanged — mint a new one.")
+		default:
+			d.logger.Info("enrollment exchange failed")
+			writeError(w, http.StatusBadGateway, "upstream_unreachable",
+				"The control plane could not be reached. If a retry reports the token as already exchanged, mint a new one.")
+		}
+		return
+	}
+
+	connection := store.Connection{BaseURL: strings.TrimRight(strings.TrimSpace(request.BaseURL), "/"), OrgID: exchange.OrgID}
+	if connection.BaseURL == "" {
+		connection.BaseURL = api.DefaultBaseURL
+	}
+	if err := d.store.Save(connection, exchange.RawKey); err != nil {
+		d.logger.Error("connection save failed", "detail", "storage error")
+		writeError(w, http.StatusInternalServerError, "storage_failed", "The minted credentials could not be stored.")
+		return
+	}
+
+	client, err := d.newClient(api.Config{BaseURL: connection.BaseURL, OrgID: exchange.OrgID, APIKey: exchange.RawKey})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "The minted credentials could not be loaded.")
+		return
+	}
+
+	d.mu.Lock()
+	d.client = client
+	d.connection = connection
+	d.cache = nil
+	d.lastError = ""
+	d.mu.Unlock()
+
+	// Best-effort probe: sets freshness/status, never discards minted creds.
+	if _, err := client.ListReports(ctx, "ENFORCEMENT", 1); err != nil {
+		code := "upstream_unreachable"
+		if api.IsAuthError(err) {
+			code = "unauthorized"
+		}
+		d.mu.Lock()
+		d.lastError = code
+		d.mu.Unlock()
+	} else {
+		now := time.Now()
+		d.mu.Lock()
+		d.lastSync = now
+		d.mu.Unlock()
+	}
+
+	d.mu.Lock()
+	status := d.statusLocked()
+	d.mu.Unlock()
+	d.logger.Info("connected via enrollment", "org_id", exchange.OrgID, "connector", exchange.ConnectorSlug)
 	writeJSON(w, http.StatusOK, status)
 }
 

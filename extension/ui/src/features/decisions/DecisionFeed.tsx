@@ -43,8 +43,9 @@ export function DecisionFeed(props: {
           Connect your Decionis org
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Live decision evaluations, verdicts, and signed Decision Dossiers appear here once an org
-          API key is connected. The key is held by the extension backend, never this UI.
+          Live decision evaluations, verdicts, and signed Decision Dossiers appear here once your
+          org is connected — paste a single-use enrollment token and the backend takes care of the
+          credentials. No API keys touch this UI.
         </Typography>
         <Button variant="contained" onClick={props.onConnect}>
           Connect
