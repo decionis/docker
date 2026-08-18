@@ -1,0 +1,10 @@
+# Build context allowlist for extension/Dockerfile (built from the repo
+# root). Everything else stays out of the context
+# (rules/security.rules.md Rule 1.4).
+*
+!go.mod
+!cmd
+!internal
+!extension
+extension/ui/node_modules
+extension/ui/build

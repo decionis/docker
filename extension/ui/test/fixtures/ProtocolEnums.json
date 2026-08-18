@@ -1,0 +1,6 @@
+{
+  "_source": "openapi/decionis-api.yaml (decionis/decionis) — ShadowEvaluateDecisionReport.outcome, .execution_action, .mode enums; recorded 2026-08-18. Regenerate whenever the published contract's enums change.",
+  "outcomes": ["APPROVE", "ESCALATE", "REJECT", "REVIEW"],
+  "execution_actions": ["CONTINUE", "STOP", "HAND_OFF", "REVIEW"],
+  "modes": ["SHADOW", "PARALLEL", "ENFORCEMENT"]
+}

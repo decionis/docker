@@ -1,5 +1,19 @@
 # Decionis for Docker
 
+<!-- Badge sweep 2026-08-18: every URL below verified HTTP 200 (rules/discovery.rules.md Rule 1.1),
+     with two branch-lifecycle caveats that resolve at merge: the decionis.yml badge endpoint
+     registers when the workflow reaches the default branch (this README publishes in the same
+     merge), and coverage populates on the first master CI run after the codecov upload landed. -->
+
+[![CI](https://github.com/decionis/docker/actions/workflows/decionis.yml/badge.svg)](https://github.com/decionis/docker/actions/workflows/decionis.yml)
+[![License](https://img.shields.io/github/license/decionis/docker)](https://github.com/decionis/docker/blob/master/LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/github.com/decionis/docker)](https://goreportcard.com/report/github.com/decionis/docker)
+[![Coverage](https://codecov.io/gh/decionis/docker/graph/badge.svg)](https://codecov.io/gh/decionis/docker)
+[![Go version](https://img.shields.io/github/go-mod/go-version/decionis/docker)](https://github.com/decionis/docker/blob/master/go.mod)
+[![Release](https://img.shields.io/github/v/release/decionis/docker)](https://github.com/decionis/docker/releases)
+[![decionis/mcp pulls](https://img.shields.io/docker/pulls/decionis/mcp?label=decionis%2Fmcp%20pulls&logo=docker)](https://hub.docker.com/r/decionis/mcp)
+[![desktop-extension pulls](https://img.shields.io/docker/pulls/decionis/desktop-extension?label=desktop-extension%20pulls&logo=docker)](https://hub.docker.com/r/decionis/desktop-extension)
+
 **Deterministic execution authority for AI agents and automated workflows running with Docker.**
 
 Decionis adds an explicit authority boundary between an AI agent's intent and consequential execution.

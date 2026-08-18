@@ -14,12 +14,14 @@ custody, orderings, and every user-owned manual step live here.
 
 ## Preconditions for the FIRST publish (Rule 1.1 gate)
 
-- [ ] `https://github.com/decionis/docker` is public — the overview and the
-      image's `org.opencontainers.image.source` label reference it. Sweep
-      2026-08-18: still 404 (repo not public yet). **Blocking.**
-- [ ] Docker Hub repo `decionis/mcp` created under the org.
-- [ ] Every URL in `mcp-server/overview.md` re-verified live on publish day;
-      update the sweep comment at the top of that file.
+- [x] `https://github.com/decionis/docker` is public — verified HTTP 200 on
+      the 2026-08-18 publish-day sweep.
+- [x] Docker Hub repo `decionis/mcp` created under the org (Hub API 200,
+      2026-08-18).
+- [x] `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` repo secrets present
+      (verified via `gh secret list`, 2026-08-18).
+- [x] Every URL in `mcp-server/overview.md` re-verified live on publish day
+      (2026-08-18); sweep comment updated.
 
 ## Versioning
 
@@ -55,3 +57,4 @@ custody, orderings, and every user-owned manual step live here.
 
 | Date | Tag | Digest | Notes |
 | ---- | --- | ------ | ----- |
+| 2026-08-18 | `mcp-v0.1.2` → `decionis/mcp:0.1.2` + `:latest` | `sha256:494710a805399eafedf2c2e77b75249835afd0c159a26ef02f58911561135a44` | First publish. Multi-arch (linux/amd64 + linux/arm64), provenance + SBOM attestations, cosign keyless signature (created in CI; verify locally with the cosign command above once cosign is installed). Full smoke suite re-run green against the published image. Overview paste into the Hub description still pending (user-owned). |

@@ -46,3 +46,4 @@ The entry must state:
 
 | Date | PR | Status | Notes |
 | ---- | -- | ------ | ----- |
+| 2026-08-18 | https://github.com/docker/mcp-registry/pull/4718 | Submitted, awaiting Docker review | `servers/decionis/server.yaml`: self-provided image `decionis/mcp`, `disableNetwork: true`, `policy_path` config → read-only mount at `/work/DECIONIS_POLICY.md`. `task validate` all green; `task build -- --tools --pull-community decionis` → 3 tools found. No test credentials needed (zero-credential evaluator). |

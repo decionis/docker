@@ -1,0 +1,43 @@
+# Publish the Dev Container Feature collection to ghcr.io/decionis/features
+# on tags `feature-govern-vX.Y.Z` (the tag must match the version in
+# features/govern/devcontainer-feature.json — asserted below; version tags
+# are immutable, rules/discovery.rules.md Rule 3.3).
+#
+# Publishing uses the repo-scoped GITHUB_TOKEN (packages: write). NOTE: a
+# package created this way starts PRIVATE — making
+# ghcr.io/decionis/features/govern public is a one-time owner step in the
+# package settings (docs/marketplace/devcontainer-feature.md).
+# Actions pinned to commit SHAs per rules/security.rules.md Rule 1.5
+# (SHA sweep 2026-08-18); the devcontainers CLI is version-pinned.
+name: feature-publish
+
+on:
+  push:
+    tags: ["feature-govern-v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Assert tag matches the feature version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#feature-govern-v}"
+          FEATURE_VERSION="$(node -p "require('./features/govern/devcontainer-feature.json').version")"
+          if [ "$TAG_VERSION" != "$FEATURE_VERSION" ]; then
+            echo "tag version $TAG_VERSION != devcontainer-feature.json version $FEATURE_VERSION" >&2
+            exit 1
+          fi
+      - name: Log in to ghcr.io
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Publish feature collection
+        run: npx -y @devcontainers/cli@0.88.0 features publish ./features --registry ghcr.io --namespace decionis/features

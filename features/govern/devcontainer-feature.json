@@ -1,0 +1,17 @@
+{
+  "id": "govern",
+  "version": "0.1.0",
+  "name": "Decionis governance (decionis CLI)",
+  "description": "Installs the decionis CLI so commands in this dev container can be governed by the repository's DECIONIS_POLICY.md (decionis govern), Decision Dossiers verified offline (decionis verify), and the containerized Decionis MCP evaluator wired into agent clients (decionis hooks install).",
+  "documentationURL": "https://github.com/decionis/docker/tree/master/features/govern",
+  "licenseURL": "https://github.com/decionis/docker/blob/master/LICENSE",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "latest",
+      "description": "decionis CLI release version to install (for example \"0.1.0\"), or \"latest\"."
+    }
+  },
+  "customizations": {},
+  "installsAfter": []
+}

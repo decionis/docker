@@ -1,0 +1,69 @@
+{
+  "dossier_id": "7c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f",
+  "generated_at": "2026-08-18T12:00:00.000Z",
+  "decision": {
+    "decision_id": "0b6f8a3e-6f2a-4c3e-9b1d-2f4a5b6c7d8e",
+    "outcome": "ESCALATE",
+    "decision_type": "production-deploy",
+    "reason": "Human authorization required for production infrastructure changes.",
+    "evaluated": {
+      "rules": 4,
+      "matched": 1
+    },
+    "edge_cases": {
+      "formfeed": "a\fb",
+      "backspace": "c\bd",
+      "separators": "x y z",
+      "html": "<a>&</a>"
+    },
+    "amounts": [
+      0.1,
+      1e+21,
+      9007199254740991
+    ]
+  },
+  "routing_decision": {
+    "outcome": "ESCALATE",
+    "policy_version": "test-policy-v3",
+    "policy_evaluation": {
+      "evaluated_at": "2026-08-18T11:59:59.000Z"
+    }
+  },
+  "governance": {
+    "policy_snapshot": {
+      "policy_version": "test-policy-v3",
+      "rules_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "evaluated_at": "2026-08-18T11:59:59.000Z"
+    }
+  },
+  "inputs_snapshot": {
+    "action": "production-deploy",
+    "environment": "production"
+  },
+  "integrity": {
+    "proof_bundle": {
+      "bundle_type": "decionis.decision_dossier.proof_bundle",
+      "version": "2.0",
+      "issued_at": "2026-08-18T12:00:00.000Z",
+      "algorithm": "Ed25519",
+      "key_id": "test-key-1",
+      "rotation_policy": {
+        "strategy": "JWKS_OVERLAP",
+        "active_key_id": "test-key-1",
+        "previous_key_ids": [],
+        "verification_grace_period_days": 30,
+        "rotated_at": null,
+        "public_jwks_path": "/.well-known/decionis-dossier-jwks.json"
+      },
+      "artifacts": [
+        {
+          "artifact_kind": "portable_artifact",
+          "media_type": "application/json",
+          "document_path": "/decision",
+          "canonical_document_sha256": "96f61ee385aceda9964365c031559c9d366b09fb97d203404b2f75cf4c8c05b1",
+          "signature": "opJoWo49c8V1TX6h13_sbft43pij23ckSzNxOBzK7y8RL33NHcJzszI0u9EBgF1YCZWsD_Le190XXsdU0d4ACw"
+        }
+      ]
+    }
+  }
+}
