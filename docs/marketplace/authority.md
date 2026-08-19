@@ -74,4 +74,4 @@ Two flags shape what the control plane is told about intercepted calls:
 
 | Date | Tag | Digest | Notes |
 | ---- | --- | ------ | ----- |
-| — | — | — | Not yet published. |
+| 2026-08-19 | `authority-v0.1.0` → `decionis/authority:0.1.0` + `:latest` | `sha256:5eea7b5f33d2ee836634e5d3e226d3b7c49875911fbfca6cd7882e1d043e3fb6` | First publish. Multi-arch (linux/amd64 + linux/arm64), provenance + SBOM, cosign keyless. Verified against the PUBLISHED image, not the local build: reports `version 0.1.0`, runs as uid 65532, `/v1/gate` answers 403 with `evaluation_unavailable` against an unreachable plane, and `/v1/mcp/before-tool-call` answers a non-empty `isError` result — the shape that stops Docker's MCP Gateway running the tool. |
