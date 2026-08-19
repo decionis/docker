@@ -71,7 +71,14 @@ Later releases (same pipeline, same guarantees):
   test fakes mirrored the client's wrong path, so only a test that drove
   the real HTTP client caught it. First release to arrive through the Hub
   release webhook (announcement email to connected owners).
-- 2026-08-19 `ext-v0.1.5` — automatic signup: the extension
+- 2026-08-19 `ext-v0.1.5` — **BROKEN, do not use.** Published without the
+  final-stage `COPY`/`CMD` instructions (an edit to the changelog label
+  replaced everything from that label to end-of-file), so the image had no
+  `metadata.json`, no UI, and no backend. `docker extension validate`
+  caught it against the published image — after the tag had already pushed
+  `:latest`. Superseded by 0.1.6 within the hour.
+- 2026-08-19 `ext-v0.1.6` — 0.1.5's payload, correctly assembled, and the
+  fix for `:latest`. Same feature set: automatic signup — the extension
   provisions a workspace on first run, so the feed is live with no account,
   no sign-in, and no typing; Advanced becomes an account email + password
   that Decionis resolves into a workspace and a minted key (no workspace
