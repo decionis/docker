@@ -137,6 +137,7 @@ func (d *Daemon) Handler() http.Handler {
 	mux.HandleFunc("GET /api/status", d.handleStatus)
 	mux.HandleFunc("PUT /api/connection", d.handleConnect)
 	mux.HandleFunc("POST /api/connect/start", d.handleConnectStart)
+	mux.HandleFunc("POST /api/connect/auto", d.handleAutoConnect)
 	mux.HandleFunc("DELETE /api/connection", d.handleDisconnect)
 	mux.HandleFunc("GET /api/decisions", d.handleDecisions)
 	mux.HandleFunc("GET /api/dossiers/{id}", d.handleDossier)
@@ -255,6 +256,11 @@ type connectRequest struct {
 	// dcn_enroll_* token exchanged at the control plane for the org id and a
 	// freshly minted scoped key (the connector self-provisioning mechanism).
 	EnrollmentToken string `json:"enrollment_token"`
+	// Email and Password connect an existing account: the control plane
+	// resolves them to a workspace and mints the scoped key. The password is
+	// never stored — it lives only for the duration of that one request.
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 // exchangeEnrollment is swapped in tests.
@@ -272,6 +278,15 @@ func (d *Daemon) handleConnect(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeError(w, http.StatusBadRequest, "invalid_request", "Body must be JSON with base_url, org_id, api_key.")
+		return
+	}
+	if strings.TrimSpace(request.Email) != "" || request.Password != "" {
+		if strings.TrimSpace(request.OrgID) != "" || strings.TrimSpace(request.EnrollmentToken) != "" {
+			writeError(w, http.StatusBadRequest, "invalid_request",
+				"Provide either an account email and password, an enrollment token, or org_id + api_key.")
+			return
+		}
+		d.connectWithCredentials(w, r, request)
 		return
 	}
 	if strings.TrimSpace(request.EnrollmentToken) != "" {

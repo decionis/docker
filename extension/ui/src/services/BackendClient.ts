@@ -192,10 +192,20 @@ export class BackendClient {
 
   connect(
     input:
+      | { email: string; password: string; base_url?: string }
       | { enrollment_token: string; base_url?: string }
       | { org_id: string; api_key: string; base_url?: string },
   ): Promise<DaemonStatus> {
     return this.transport.request("PUT", "/api/connection", input) as Promise<DaemonStatus>;
+  }
+
+  /**
+   * Automatic signup: asks the daemon to create a workspace with no account
+   * and no input at all. Used once, on first open.
+   */
+  connectAuto(baseUrl?: string): Promise<DaemonStatus> {
+    const body = baseUrl && baseUrl.trim() ? { base_url: baseUrl.trim() } : {};
+    return this.transport.request("POST", "/api/connect/auto", body) as Promise<DaemonStatus>;
   }
 
   /** Starts a one-click connect; the returned URL opens in the browser. */

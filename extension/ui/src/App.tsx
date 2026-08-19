@@ -35,6 +35,7 @@ export function App() {
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [dismissedUpdate, setDismissedUpdate] = useState<string | null>(() => readDismissedVersion());
   const pollRef = useRef<number | null>(null);
+  const autoSignupTried = useRef(false);
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -64,6 +65,23 @@ export function App() {
   useEffect(() => {
     void refreshStatus();
   }, [refreshStatus]);
+
+  // First run: create a workspace so the extension is useful immediately —
+  // no account, no sign-in, no fields. Runs once per extension install, only
+  // when the daemon reports it has never been connected; a failure is silent
+  // here and simply leaves the normal connect options in the disconnected
+  // view. The daemon refuses a second mint, so this can never replace a
+  // working connection.
+  useEffect(() => {
+    if (status === null || status.connected || autoSignupTried.current) return;
+    autoSignupTried.current = true;
+    backend
+      .connectAuto()
+      .then(setStatus)
+      .catch(() => {
+        /* leave the disconnected view and its connect options in place */
+      });
+  }, [status, backend]);
 
   useEffect(() => {
     backend

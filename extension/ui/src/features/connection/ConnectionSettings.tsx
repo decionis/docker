@@ -20,12 +20,14 @@ const BROWSER_POLL_MS = 2_000;
 const BROWSER_WAIT_LIMIT_MS = 10 * 60_000; // matches the daemon's pending TTL
 
 /**
- * First-run connect. Primary path: one click — the browser signs the user
- * in, the control plane mints a single-use enrollment token, and its
- * loopback redirect lands on the daemon, which exchanges it for a scoped
- * key only the backend holds. A pasted enrollment token and manual org ID +
- * API key stay available. Nothing secret is persisted UI-side
- * (rules/security.rules.md Rule 2.3).
+ * Connect options, in the order most people need them. New users never open
+ * this dialog at all — the extension provisions a workspace on first run.
+ * Here: one click through the browser, a pasted single-use enrollment token,
+ * or an account email + password that Decionis resolves into a workspace and
+ * a freshly minted scoped key. No workspace UUID, no API key to copy.
+ *
+ * Nothing secret is persisted UI-side (rules/security.rules.md Rule 2.3):
+ * the password lives in component state only until its request returns.
  */
 export function ConnectionSettings(props: {
   open: boolean;
@@ -34,9 +36,9 @@ export function ConnectionSettings(props: {
   onClose: () => void;
   onChanged: (status: DaemonStatus) => void;
 }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [enrollmentToken, setEnrollmentToken] = useState("");
-  const [orgId, setOrgId] = useState("");
-  const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -46,8 +48,8 @@ export function ConnectionSettings(props: {
 
   const connected = Boolean(props.status?.connected);
   const usingToken = enrollmentToken.trim() !== "";
-  const usingManual = orgId.trim() !== "" && apiKey !== "";
-  const canConnect = !busy && !waitingBrowser && (usingToken ? !usingManual : usingManual);
+  const usingAccount = email.trim() !== "" && password !== "";
+  const canConnect = !busy && !waitingBrowser && (usingToken ? !usingAccount : usingAccount);
 
   const stopWaiting = () => {
     if (pollRef.current !== null) {
@@ -102,9 +104,10 @@ export function ConnectionSettings(props: {
       const base = baseUrl.trim() ? { base_url: baseUrl.trim() } : {};
       const next = usingToken
         ? await props.backend.connect({ enrollment_token: enrollmentToken.trim(), ...base })
-        : await props.backend.connect({ org_id: orgId.trim(), api_key: apiKey, ...base });
+        : await props.backend.connect({ email: email.trim(), password, ...base });
       setEnrollmentToken("");
-      setApiKey("");
+      // The password exists in this component only until the request returns.
+      setPassword("");
       props.onChanged(next);
       props.onClose();
     } catch (raw) {
@@ -172,7 +175,7 @@ export function ConnectionSettings(props: {
             onChange={(event) => setEnrollmentToken(event.target.value)}
             autoComplete="off"
             fullWidth
-            disabled={usingManual}
+            disabled={usingAccount}
             inputProps={{ style: { fontFamily: "monospace" } }}
           />
 
@@ -183,24 +186,31 @@ export function ConnectionSettings(props: {
             disableGutters
           >
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="body2">Advanced: org ID and API key, or a custom API base URL</Typography>
+              <Typography variant="body2">Already have a Decionis account? Sign in here</Typography>
             </AccordionSummary>
             <AccordionDetails>
               <Stack spacing={2}>
+                <Typography variant="body2" color="text.secondary">
+                  Decionis finds your workspace and issues the extension its own
+                  credential — there is no key to copy. Your password is used for
+                  this one request and is never stored.
+                </Typography>
                 <TextField
-                  label="Organization ID"
-                  placeholder="00000000-0000-0000-0000-000000000000"
-                  value={orgId}
-                  onChange={(event) => setOrgId(event.target.value)}
+                  label="Email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  autoComplete="username"
                   fullWidth
                   disabled={usingToken}
                 />
                 <TextField
-                  label="Org API key"
+                  label="Password"
                   type="password"
-                  value={apiKey}
-                  onChange={(event) => setApiKey(event.target.value)}
-                  autoComplete="off"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  autoComplete="current-password"
                   fullWidth
                   disabled={usingToken}
                 />
