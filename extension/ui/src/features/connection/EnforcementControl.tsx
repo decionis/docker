@@ -25,12 +25,29 @@ export function EnforcementControl(props: {
   onChanged: (next: WorkspaceState) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [claiming, setClaiming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const { workspace } = props;
   const limit = workspace.governed_limit;
   const metered = limit !== null;
   const used = workspace.governed_used;
+
+  const claim = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const started = await props.backend.startClaim();
+      props.backend.openExternal(started.claim_url);
+      setClaiming(true);
+    } catch (raw) {
+      setError(
+        raw instanceof BackendError ? raw.message : "The Decionis daemon is not reachable.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const toggle = async (enabled: boolean) => {
     setBusy(true);
@@ -73,6 +90,23 @@ export function EnforcementControl(props: {
           </Box>
         }
       />
+
+      {workspace.provisional && (
+        <Alert
+          severity="info"
+          action={
+            claiming ? undefined : (
+              <Button size="small" onClick={() => void claim()} disabled={busy}>
+                Claim workspace
+              </Button>
+            )
+          }
+        >
+          {claiming
+            ? "Finish claiming in your browser, then return here."
+            : "This workspace is temporary — it has no owner, keeps the free allowance, and is lost if this extension is removed. Claim it to keep it."}
+        </Alert>
+      )}
 
       {workspace.enforcement_reverted && (
         <Alert severity="warning">

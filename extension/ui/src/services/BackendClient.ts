@@ -109,6 +109,27 @@ export interface WorkspaceState {
   subscribe_url: string;
 }
 
+export interface PendingApproval {
+  id: string;
+  status: string;
+  severity: string;
+  decision_domain: string;
+  trigger_reason: string;
+  decision_id: string;
+  surfaced_at: string;
+  expires_at: string;
+}
+
+export interface ApprovalsPayload {
+  approvals: PendingApproval[];
+  count: number;
+}
+
+export interface ClaimStart {
+  claim_url: string;
+  expires_in: number;
+}
+
 export interface UpdateInfo {
   current_version: string;
   latest_version?: string;
@@ -242,6 +263,16 @@ export class BackendClient {
   /** Enforcement state and the free governed-decision allowance. */
   workspace(): Promise<WorkspaceState> {
     return this.transport.request("GET", "/api/workspace") as Promise<WorkspaceState>;
+  }
+
+  /** Entries awaiting a person's review. */
+  approvals(): Promise<ApprovalsPayload> {
+    return this.transport.request("GET", "/api/approvals") as Promise<ApprovalsPayload>;
+  }
+
+  /** Mints a claim URL for this workspace; the browser finishes the claim. */
+  startClaim(): Promise<ClaimStart> {
+    return this.transport.request("POST", "/api/workspace/claim", {}) as Promise<ClaimStart>;
   }
 
   /** Turns enforcement on or off. Throws BackendError on refusal. */

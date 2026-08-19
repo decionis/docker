@@ -88,3 +88,53 @@ func (c *Client) SetEnforcement(ctx context.Context, enabled bool) (*WorkspaceSt
 		return nil, &StatusError{Op: "enforcement", StatusCode: response.StatusCode}
 	}
 }
+
+// ClaimStart is the browser URL that claims this workspace, plus how long
+// the token behind it lasts.
+type ClaimStart struct {
+	ClaimURL  string `json:"claim_url"`
+	ExpiresIn int    `json:"expires_in"`
+}
+
+// ErrAlreadyClaimed means this workspace already belongs to an account.
+var ErrAlreadyClaimed = errors.New("this workspace already belongs to an account")
+
+// StartClaim mints a claim token for this workspace and returns the URL a
+// browser must open to finish. The token is returned once and never stored
+// here: it goes straight to the browser.
+func (c *Client) StartClaim(ctx context.Context) (*ClaimStart, error) {
+	query := url.Values{}
+	query.Set("org_id", c.config.OrgID)
+	requestURL := c.config.BaseURL + "/v1/docker-desktop/workspace/claim-token?" + query.Encode()
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, nil)
+	if err != nil {
+		return nil, errors.New("decionis api: claim: build request failed")
+	}
+	request.Header.Set("Authorization", "Bearer "+c.config.APIKey)
+	request.Header.Set("Accept", "application/json")
+
+	response, err := c.httpClient.Do(request)
+	if err != nil {
+		return nil, errors.New("decionis api: claim: control plane unreachable")
+	}
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(response.Body, 64<<10))
+	if err != nil {
+		return nil, errors.New("decionis api: claim: response read failed")
+	}
+
+	switch response.StatusCode {
+	case http.StatusOK:
+		var start ClaimStart
+		if err := json.Unmarshal(body, &start); err != nil || start.ClaimURL == "" {
+			return nil, errors.New("decionis api: claim: malformed response")
+		}
+		return &start, nil
+	case http.StatusConflict:
+		return nil, ErrAlreadyClaimed
+	default:
+		return nil, &StatusError{Op: "claim", StatusCode: response.StatusCode}
+	}
+}

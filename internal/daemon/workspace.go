@@ -14,6 +14,8 @@ import (
 type WorkspaceReader interface {
 	GetWorkspaceState(ctx context.Context) (*api.WorkspaceState, error)
 	SetEnforcement(ctx context.Context, enabled bool) (*api.WorkspaceState, error)
+	StartClaim(ctx context.Context) (*api.ClaimStart, error)
+	ListPendingApprovals(ctx context.Context, limit int) ([]api.PendingApproval, error)
 }
 
 type enforcementRequest struct {
@@ -92,4 +94,62 @@ func (d *Daemon) workspaceClient() (WorkspaceReader, bool) {
 	}
 	reader, ok := client.(WorkspaceReader)
 	return reader, ok
+}
+
+// handleClaimStart mints a claim URL for this workspace and hands it to the
+// UI to open in a browser. The claim token never touches the daemon's
+// store: it is short-lived, single-use, and only meaningful in the browser
+// that finishes the claim.
+func (d *Daemon) handleClaimStart(w http.ResponseWriter, r *http.Request) {
+	client, ok := d.workspaceClient()
+	if !ok {
+		writeError(w, http.StatusPreconditionRequired, "not_connected", "Connect to Decionis first.")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), upstreamTimeout)
+	defer cancel()
+
+	start, err := client.StartClaim(ctx)
+	if err != nil {
+		if errors.Is(err, api.ErrAlreadyClaimed) {
+			writeError(w, http.StatusConflict, "already_claimed",
+				"This workspace already belongs to an account.")
+			return
+		}
+		d.logger.Info("claim start failed")
+		writeError(w, http.StatusBadGateway, "upstream_unreachable",
+			"The control plane could not be reached; nothing changed.")
+		return
+	}
+	d.logger.Info("claim started")
+	writeJSON(w, http.StatusOK, start)
+}
+
+// handleApprovals lists what is waiting on a person.
+//
+// A control plane that cannot answer yields an error, never an empty list:
+// "nothing is waiting" and "we could not find out" must not look the same
+// in a governance surface.
+func (d *Daemon) handleApprovals(w http.ResponseWriter, r *http.Request) {
+	client, ok := d.workspaceClient()
+	if !ok {
+		writeError(w, http.StatusPreconditionRequired, "not_connected", "Connect to Decionis first.")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), upstreamTimeout)
+	defer cancel()
+
+	approvals, err := client.ListPendingApprovals(ctx, 50)
+	if err != nil {
+		d.logger.Info("pending approvals unavailable")
+		writeError(w, http.StatusBadGateway, "upstream_unreachable",
+			"The pending queue could not be read.")
+		return
+	}
+	if approvals == nil {
+		approvals = []api.PendingApproval{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"approvals": approvals, "count": len(approvals)})
 }
