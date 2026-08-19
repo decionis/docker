@@ -34,6 +34,13 @@ The load-bearing ones:
 - Secrets: the local evaluator requires none by design; connected-mode org
   API keys live only in the daemon/backend — never in images, the extension
   UI, logs, or this repository.
+- Account passwords: the Advanced connect path forwards an account email and
+  password to the control plane for exactly one request, to be exchanged for
+  a scoped key. The password is never written to the store, never logged,
+  never returned to the UI, and is cleared from component state as soon as
+  the request completes. The extension reads no Docker credential store and
+  no Docker Hub secret — Docker Desktop exposes no identity to extensions,
+  and the workspace is named by the control plane instead.
 
 ## Docker Desktop extension privileges
 

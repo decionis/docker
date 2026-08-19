@@ -61,6 +61,17 @@ Later releases (same pipeline, same guarantees):
   extension's own public Docker Hub tags listing (anonymous, cached 6 h,
   fail-open — an unreachable listing claims nothing) and the UI shows a
   dismissible per-version banner with the `docker extension update` command.
+- (pending upstream deploy) `ext-v0.1.5` — automatic signup: the extension
+  provisions a workspace on first run, so the feed is live with no account,
+  no sign-in, and no typing; Advanced becomes an account email + password
+  that Decionis resolves into a workspace and a minted key (no workspace
+  UUID, no API key). Requires decionis/Decionis#917 deployed — the
+  extension calls `/v1/public/connect/docker-desktop/{provision,credentials}`.
+  NOTE on naming: the workspace is named "My Docker Workspace" because
+  Docker Desktop exposes no identity to extensions — `docker info` carries
+  no Username on Docker 29, and the only local alternative would mean
+  reading the user's Docker Hub secret from the credential store, which
+  this extension does not do.
 - 2026-08-19 `ext-v0.1.4` → `:0.1.4` — one-click connect: "Continue in
   browser" starts the control plane's docker-desktop flow (sign-in +
   auto-provision, RFC 8252 loopback redirect to the daemon's listener on
