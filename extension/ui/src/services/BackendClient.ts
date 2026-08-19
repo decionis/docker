@@ -110,14 +110,16 @@ export interface WorkspaceState {
 }
 
 export interface PendingApproval {
-  id: string;
-  status: string;
-  severity: string;
-  decision_domain: string;
-  trigger_reason: string;
-  decision_id: string;
-  surfaced_at: string;
-  expires_at: string;
+  evaluation_id: string;
+  decision_type: string;
+  outcome: string;
+  mode: string;
+  policy_version: string;
+  amount: string | null;
+  channel: string | null;
+  dossier_id: string | null;
+  created_at: string;
+  override_status: string | null;
 }
 
 export interface ApprovalsPayload {
