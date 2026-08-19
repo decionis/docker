@@ -44,7 +44,7 @@ LABEL org.opencontainers.image.title="Decionis" \
     com.docker.extension.publisher-url="https://decionis.com" \
     com.docker.extension.additional-urls="[{\"title\":\"Documentation\",\"url\":\"https://decionis.com/docs/protocol-mcp\"},{\"title\":\"Repository\",\"url\":\"https://github.com/decionis/docker\"}]" \
     com.docker.extension.categories="security" \
-    com.docker.extension.changelog="<p>0.1.2: connect with a single-use enrollment token — no manual org ID or API key. Initial preview: live decision evaluations, decision summary, offline Ed25519 dossier verification, reproducibility posture.</p>"
+    com.docker.extension.changelog="<p>0.1.6: repairs 0.1.5, which was published without its application files and could not run — install or update to 0.1.6. 0.1.5: works the moment you install it — a workspace is created automatically on first run, so the decision feed is live with no account and no sign-in. Enforcement is now a checkbox (shadow by default) with 25 free governed decisions; shadow evaluations stay unlimited. Already have a Decionis account? Sign in with your email and password — no workspace ID or API key to copy. 0.1.4: one-click connect. 0.1.3: update banner. 0.1.2: enrollment-token connect. Initial preview: live decision evaluations, decision summary, offline Ed25519 dossier verification, reproducibility posture.</p>"
 
 COPY extension/metadata.json /metadata.json
 COPY extension/icon.svg /icon.svg

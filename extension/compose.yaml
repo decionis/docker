@@ -6,7 +6,22 @@ services:
   decionis-daemon:
     image: ${DESKTOP_PLUGIN_IMAGE}
     restart: always
-    entrypoint: ["/backend", "-socket", "/run/guest-services/backend.sock", "-data", "/data"]
+    entrypoint:
+      [
+        "/backend",
+        "-socket",
+        "/run/guest-services/backend.sock",
+        "-loopback",
+        ":53719",
+        "-data",
+        "/data",
+      ]
+    # One-click connect (RFC 8252): the browser's enrollment redirect lands
+    # on the host's 127.0.0.1:53719 and reaches the daemon's loopback
+    # listener, which serves only /enroll (state-bound, single-use). Bound
+    # to the host's loopback interface only — never a routable address.
+    ports:
+      - "127.0.0.1:53719:53719"
     volumes:
       - decionis-data:/data
 volumes:

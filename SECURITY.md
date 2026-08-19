@@ -34,6 +34,13 @@ The load-bearing ones:
 - Secrets: the local evaluator requires none by design; connected-mode org
   API keys live only in the daemon/backend — never in images, the extension
   UI, logs, or this repository.
+- Account passwords: the Advanced connect path forwards an account email and
+  password to the control plane for exactly one request, to be exchanged for
+  a scoped key. The password is never written to the store, never logged,
+  never returned to the UI, and is cleared from component state as soon as
+  the request completes. The extension reads no Docker credential store and
+  no Docker Hub secret — Docker Desktop exposes no identity to extensions,
+  and the workspace is named by the control plane instead.
 
 ## Docker Desktop extension privileges
 
@@ -47,7 +54,8 @@ any change to `extension/metadata.json` or `extension/compose.yaml`.
 | Extension socket (`vm.exposes.socket`) | Yes | The only channel between the UI and the daemon. Every request over it is schema-validated with a 100 KB bound (Rule 4.4). |
 | Private named volume (`decionis-data:/data`) | Yes | Connection settings and the org API key at rest, `0600` inside the backend's private volume (Rule 2.5). No host paths are mounted. |
 | Root user inside the extension VM container | Yes (today) | Required to bind `/run/guest-services/backend.sock`. Revisit for a non-root bind once verified against current Docker Desktop. |
+| Published host port `127.0.0.1:53719` | Yes | The one-click connect redirect (RFC 8252): the browser's enrollment redirect lands on the host's loopback and reaches the daemon's listener, which serves only `/enroll` — state-bound (constant-time compare), single-use, 10-minute expiry. The token it carries is consumed by the exchange immediately, so the copy left in browser history is dead. Bound to the host's loopback interface only. |
 | Docker Engine socket | **No** | The extension does not mount or use the Engine socket (Rule 4.2). |
 | Host binaries | **No** | None are shipped. |
 | Host filesystem mounts | **No** | None. |
-| Outbound network | Daemon only | HTTPS to the connected org's Decionis control plane and the dossier JWKS URL; certificate verification always on (Rule 2.6). |
+| Outbound network | Daemon only | HTTPS to the connected org's Decionis control plane and the dossier JWKS URL; certificate verification always on (Rule 2.6). Plus one anonymous, credential-free GET of the extension's own public Docker Hub tags listing for the update banner (cached 6 h; carries no identifiers; fail-open — an unreachable listing claims nothing). |

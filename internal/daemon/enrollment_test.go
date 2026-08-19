@@ -15,8 +15,10 @@ const mintedKeySentinel = "dcn_live_MINTED-SENTINEL-NEVER-LOGGED"
 
 func withFakeExchange(t *testing.T, exchange *api.EnrollmentExchange, exchangeErr error) {
 	t.Helper()
-	original := exchangeEnrollment
-	exchangeEnrollment = func(_ context.Context, _ string, token string) (*api.EnrollmentExchange, error) {
+	stub := usePublicStub(t, &stubPublicAPI{})
+	// Keyed on the sentinel so the test proves the exact token reached the
+	// exchange, not merely that some exchange happened.
+	stub.exchangeFn = func(token string) (*api.EnrollmentExchange, error) {
 		if token != enrollmentSentinel {
 			return nil, api.ErrEnrollmentInvalid
 		}
@@ -25,7 +27,6 @@ func withFakeExchange(t *testing.T, exchange *api.EnrollmentExchange, exchangeEr
 		}
 		return exchange, nil
 	}
-	t.Cleanup(func() { exchangeEnrollment = original })
 }
 
 func enrollBody() string {

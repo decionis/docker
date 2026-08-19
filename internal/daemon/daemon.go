@@ -24,7 +24,22 @@ import (
 	"github.com/decionis/docker/internal/api"
 	"github.com/decionis/docker/internal/dossier"
 	"github.com/decionis/docker/internal/store"
+	"github.com/decionis/docker/internal/updatecheck"
 )
+
+// extensionRepository is the Docker Hub repository whose public tags listing
+// the update check reads (SECURITY.md documents this outbound destination).
+const extensionRepository = "decionis/desktop-extension"
+
+// Successful update checks are served from cache this long; failed ones
+// retry sooner.
+const (
+	updateCacheTTL      = 6 * time.Hour
+	updateRetryInterval = 15 * time.Minute
+)
+
+// checkUpdate is swapped in tests.
+var checkUpdate = updatecheck.Check
 
 // maxRequestBody bounds every UI request body (rules/security.rules.md 3.3).
 const maxRequestBody = 100 << 10
@@ -75,6 +90,11 @@ type Daemon struct {
 	lastSync   time.Time
 	lastError  string
 	cache      *decisionsCache
+
+	updateResult    *updatecheck.Result
+	updateFetchedAt time.Time
+
+	pendingConnect *pendingOneClick
 }
 
 // New builds a daemon. The logger must never receive credentials; nothing in
@@ -113,9 +133,14 @@ func (d *Daemon) LoadStoredConnection() {
 func (d *Daemon) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/version", d.handleVersion)
+	mux.HandleFunc("GET /api/update", d.handleUpdate)
 	mux.HandleFunc("GET /api/status", d.handleStatus)
 	mux.HandleFunc("PUT /api/connection", d.handleConnect)
+	mux.HandleFunc("POST /api/connect/start", d.handleConnectStart)
+	mux.HandleFunc("POST /api/connect/auto", d.handleAutoConnect)
 	mux.HandleFunc("DELETE /api/connection", d.handleDisconnect)
+	mux.HandleFunc("GET /api/workspace", d.handleWorkspace)
+	mux.HandleFunc("PUT /api/workspace/enforcement", d.handleEnforcement)
 	mux.HandleFunc("GET /api/decisions", d.handleDecisions)
 	mux.HandleFunc("GET /api/dossiers/{id}", d.handleDossier)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -188,6 +213,37 @@ func (d *Daemon) handleVersion(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"version": d.version})
 }
 
+// handleUpdate serves the cached update check (anonymous read of the
+// extension repository's public Docker Hub tags listing). Fail-open but
+// honest: an unreachable listing yields checked=false and claims nothing.
+func (d *Daemon) handleUpdate(w http.ResponseWriter, r *http.Request) {
+	d.mu.Lock()
+	cached := d.updateResult
+	fetchedAt := d.updateFetchedAt
+	d.mu.Unlock()
+
+	if cached != nil {
+		ttl := updateRetryInterval
+		if cached.Checked {
+			ttl = updateCacheTTL
+		}
+		if time.Since(fetchedAt) < ttl {
+			writeJSON(w, http.StatusOK, cached)
+			return
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), upstreamTimeout)
+	defer cancel()
+	result := checkUpdate(ctx, extensionRepository, d.version)
+
+	d.mu.Lock()
+	d.updateResult = &result
+	d.updateFetchedAt = time.Now()
+	d.mu.Unlock()
+	writeJSON(w, http.StatusOK, &result)
+}
+
 func (d *Daemon) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -202,10 +258,12 @@ type connectRequest struct {
 	// dcn_enroll_* token exchanged at the control plane for the org id and a
 	// freshly minted scoped key (the connector self-provisioning mechanism).
 	EnrollmentToken string `json:"enrollment_token"`
+	// Email and Password connect an existing account: the control plane
+	// resolves them to a workspace and mints the scoped key. The password is
+	// never stored — it lives only for the duration of that one request.
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
-
-// exchangeEnrollment is swapped in tests.
-var exchangeEnrollment = api.ExchangeEnrollment
 
 func (d *Daemon) handleConnect(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
@@ -219,6 +277,15 @@ func (d *Daemon) handleConnect(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeError(w, http.StatusBadRequest, "invalid_request", "Body must be JSON with base_url, org_id, api_key.")
+		return
+	}
+	if strings.TrimSpace(request.Email) != "" || request.Password != "" {
+		if strings.TrimSpace(request.OrgID) != "" || strings.TrimSpace(request.EnrollmentToken) != "" {
+			writeError(w, http.StatusBadRequest, "invalid_request",
+				"Provide either an account email and password, an enrollment token, or org_id + api_key.")
+			return
+		}
+		d.connectWithCredentials(w, r, request)
 		return
 	}
 	if strings.TrimSpace(request.EnrollmentToken) != "" {
@@ -299,62 +366,32 @@ func (d *Daemon) connectViaEnrollment(w http.ResponseWriter, r *http.Request, re
 	ctx, cancel := context.WithTimeout(r.Context(), upstreamTimeout)
 	defer cancel()
 
-	exchange, err := exchangeEnrollment(ctx, baseURL, request.EnrollmentToken)
-	if err != nil {
-		switch {
-		case errors.Is(err, api.ErrEnrollmentInvalid):
-			d.logger.Info("enrollment exchange rejected")
-			writeError(w, http.StatusUnauthorized, "enrollment_invalid", "The enrollment token is invalid or expired.")
-		case errors.Is(err, api.ErrEnrollmentUsed):
-			writeError(w, http.StatusConflict, "enrollment_used", "This enrollment token has already been exchanged — mint a new one.")
-		default:
-			d.logger.Info("enrollment exchange failed")
-			writeError(w, http.StatusBadGateway, "upstream_unreachable",
-				"The control plane could not be reached. If a retry reports the token as already exchanged, mint a new one.")
-		}
+	switch code := d.establishFromEnrollment(ctx, baseURL, request.EnrollmentToken); code {
+	case "":
+		// success — fall through to report status
+	case "enrollment_invalid":
+		d.logger.Info("enrollment exchange rejected")
+		writeError(w, http.StatusUnauthorized, "enrollment_invalid", "The enrollment token is invalid or expired.")
 		return
-	}
-
-	connection := store.Connection{BaseURL: baseURL, OrgID: exchange.OrgID}
-	if err := d.store.Save(connection, exchange.RawKey); err != nil {
-		d.logger.Error("connection save failed", "detail", "storage error")
+	case "enrollment_used":
+		writeError(w, http.StatusConflict, "enrollment_used", "This enrollment token has already been exchanged — mint a new one.")
+		return
+	case "storage_failed":
 		writeError(w, http.StatusInternalServerError, "storage_failed", "The minted credentials could not be stored.")
 		return
-	}
-
-	client, err := d.newClient(api.Config{BaseURL: connection.BaseURL, OrgID: exchange.OrgID, APIKey: exchange.RawKey})
-	if err != nil {
+	case "internal_error":
 		writeError(w, http.StatusInternalServerError, "internal_error", "The minted credentials could not be loaded.")
 		return
-	}
-
-	d.mu.Lock()
-	d.client = client
-	d.connection = connection
-	d.cache = nil
-	d.lastError = ""
-	d.mu.Unlock()
-
-	// Best-effort probe: sets freshness/status, never discards minted creds.
-	if _, err := client.ListReports(ctx, "ENFORCEMENT", 1); err != nil {
-		code := "upstream_unreachable"
-		if api.IsAuthError(err) {
-			code = "unauthorized"
-		}
-		d.mu.Lock()
-		d.lastError = code
-		d.mu.Unlock()
-	} else {
-		now := time.Now()
-		d.mu.Lock()
-		d.lastSync = now
-		d.mu.Unlock()
+	default:
+		d.logger.Info("enrollment exchange failed")
+		writeError(w, http.StatusBadGateway, "upstream_unreachable",
+			"The control plane could not be reached. If a retry reports the token as already exchanged, mint a new one.")
+		return
 	}
 
 	d.mu.Lock()
 	status := d.statusLocked()
 	d.mu.Unlock()
-	d.logger.Info("connected via enrollment", "org_id", exchange.OrgID, "connector", exchange.ConnectorSlug)
 	writeJSON(w, http.StatusOK, status)
 }
 

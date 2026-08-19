@@ -27,11 +27,11 @@ func TestExchangeEnrollmentSuccess(t *testing.T) {
 	}))
 	defer server.Close()
 
-	exchange, err := ExchangeEnrollment(context.Background(), server.URL, "dcn_enroll_0123456789abcdef")
+	exchange, err := mustPublicClient(t, server.URL).ExchangeEnrollment(context.Background(), "dcn_enroll_0123456789abcdef")
 	if err != nil {
 		t.Fatalf("exchange: %v", err)
 	}
-	if gotPath != "/connectors/enrollments/exchange" {
+	if gotPath != "/v1/connectors/enrollments/exchange" {
 		t.Fatalf("unexpected path %q", gotPath)
 	}
 	if gotToken != "dcn_enroll_0123456789abcdef" {
@@ -50,23 +50,36 @@ func TestExchangeEnrollmentErrorMapping(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := ExchangeEnrollment(context.Background(), server.URL, "dcn_enroll_0123456789abcdef")
+	_, err := mustPublicClient(t, server.URL).ExchangeEnrollment(context.Background(), "dcn_enroll_0123456789abcdef")
 	if !errors.Is(err, ErrEnrollmentInvalid) {
 		t.Fatalf("401 must map to ErrEnrollmentInvalid, got %v", err)
 	}
 
 	status = http.StatusConflict
-	_, err = ExchangeEnrollment(context.Background(), server.URL, "dcn_enroll_0123456789abcdef")
+	_, err = mustPublicClient(t, server.URL).ExchangeEnrollment(context.Background(), "dcn_enroll_0123456789abcdef")
 	if !errors.Is(err, ErrEnrollmentUsed) {
 		t.Fatalf("409 must map to ErrEnrollmentUsed, got %v", err)
 	}
 }
 
 func TestExchangeEnrollmentGuards(t *testing.T) {
-	if _, err := ExchangeEnrollment(context.Background(), "http://api.decionis.com", "dcn_enroll_0123456789abcdef"); err == nil {
+	// A non-loopback http base URL must be refused when the client is built,
+	// before any request can be shaped.
+	if _, err := NewPublicClient("http://api.decionis.com"); err == nil {
 		t.Fatal("non-localhost http must be rejected")
 	}
-	if _, err := ExchangeEnrollment(context.Background(), "https://api.decionis.com", "short"); !errors.Is(err, ErrEnrollmentInvalid) {
+	if _, err := mustPublicClient(t, "https://api.decionis.com").ExchangeEnrollment(context.Background(), "short"); !errors.Is(err, ErrEnrollmentInvalid) {
 		t.Fatal("obviously invalid tokens must be rejected locally without a network call")
 	}
+}
+
+// mustPublicClient builds a pre-auth client for a test server, failing the
+// test if the base URL does not pass the transport gate.
+func mustPublicClient(t *testing.T, baseURL string) *Client {
+	t.Helper()
+	client, err := NewPublicClient(baseURL)
+	if err != nil {
+		t.Fatalf("NewPublicClient(%q): %v", baseURL, err)
+	}
+	return client
 }

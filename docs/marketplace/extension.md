@@ -50,6 +50,47 @@ cosign keyless; index digest
 Short description and overview (from `extension/overview.md`) set the same
 day and verified via the Hub API.
 
+Later releases (same pipeline, same guarantees):
+
+- 2026-08-18 `ext-v0.1.1` → `:0.1.1` — screenshots label; first fully green
+  `docker extension validate`.
+- 2026-08-18 `ext-v0.1.2` → `:0.1.2` — enrollment-token connect (single-use
+  `dcn_enroll_*` token exchanged by the daemon; org ID + API key demoted to
+  Advanced).
+- 2026-08-18 `ext-v0.1.3` → `:0.1.3` — update banner: the daemon checks the
+  extension's own public Docker Hub tags listing (anonymous, cached 6 h,
+  fail-open — an unreachable listing claims nothing) and the UI shows a
+  dismissible per-version banner with the `docker extension update` command.
+- 2026-08-19 `ext-v0.1.4` → `:0.1.4` — one-click connect: "Continue in
+  browser" starts the control plane's docker-desktop flow (sign-in +
+  auto-provision, RFC 8252 loopback redirect to the daemon's listener on
+  host `127.0.0.1:53719`, state-bound single-use `/enroll`, minted token
+  exchanged exactly like a pasted one). Also fixes the enrollment exchange
+  endpoint path (`/connectors/…` → `/v1/connectors/…`): pasted-token
+  connects against the hosted plane had been failing since 0.1.2 — earlier
+  test fakes mirrored the client's wrong path, so only a test that drove
+  the real HTTP client caught it. First release to arrive through the Hub
+  release webhook (announcement email to connected owners).
+- 2026-08-19 `ext-v0.1.5` — **BROKEN, do not use.** Published without the
+  final-stage `COPY`/`CMD` instructions (an edit to the changelog label
+  replaced everything from that label to end-of-file), so the image had no
+  `metadata.json`, no UI, and no backend. `docker extension validate`
+  caught it against the published image — after the tag had already pushed
+  `:latest`. Superseded by 0.1.6 within the hour.
+- 2026-08-19 `ext-v0.1.6` — 0.1.5's payload, correctly assembled, and the
+  fix for `:latest`. Same feature set: automatic signup — the extension
+  provisions a workspace on first run, so the feed is live with no account,
+  no sign-in, and no typing; Advanced becomes an account email + password
+  that Decionis resolves into a workspace and a minted key (no workspace
+  UUID, no API key). Requires decionis/Decionis#917 deployed — the
+  extension calls `/v1/public/connect/docker-desktop/{provision,credentials}`.
+  NOTE on naming: the workspace is named "My Docker Workspace" because
+  Docker Desktop exposes no identity to extensions — `docker info` carries
+  no Username on Docker 29, and the only local alternative would mean
+  reading the user's Docker Hub secret from the credential store, which
+  this extension does not do.
+
+
 ## Before marketplace submission (Rule 1.1 gates)
 
 - [x] Repo public: `https://github.com/decionis/docker` resolves (HTTP 200,
