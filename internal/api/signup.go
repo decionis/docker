@@ -65,6 +65,13 @@ func postWorkspace(
 	baseURL, path string,
 	payload map[string]string,
 ) (*Workspace, error) {
+	// Single transport gate (see ValidateBaseURL): the request URL is
+	// rebuilt from a parsed scheme, validated host, and path — https off
+	// loopback, and embedded credentials, query, and fragment are rejected.
+	// Only the normalized value reaches the network; `path` is a package
+	// constant. The host stays operator-configurable on purpose (self-hosted
+	// control planes), which is why the UI names the destination wherever a
+	// password is typed.
 	normalizedBaseURL, err := ValidateBaseURL(baseURL)
 	if err != nil {
 		return nil, err

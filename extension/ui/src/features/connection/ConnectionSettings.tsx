@@ -16,6 +16,24 @@ import { useEffect, useRef, useState } from "react";
 
 import { BackendClient, BackendError, type DaemonStatus } from "../../services/BackendClient";
 
+const DEFAULT_API_HOST = "api.decionis.com";
+
+/**
+ * The host an account sign-in would actually reach. Shown next to the
+ * password field so the destination is visible at the moment credentials
+ * are typed: a custom base URL is a legitimate self-hosting feature, but it
+ * must never quietly become somewhere else to send a password.
+ */
+function credentialDestination(baseUrl: string): string {
+  const trimmed = baseUrl.trim();
+  if (!trimmed) return DEFAULT_API_HOST;
+  try {
+    return new URL(/^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`).host;
+  } catch {
+    return trimmed; // unparseable: show exactly what was typed, claim nothing
+  }
+}
+
 const BROWSER_POLL_MS = 2_000;
 const BROWSER_WAIT_LIMIT_MS = 10 * 60_000; // matches the daemon's pending TTL
 
@@ -49,6 +67,8 @@ export function ConnectionSettings(props: {
   const connected = Boolean(props.status?.connected);
   const usingToken = enrollmentToken.trim() !== "";
   const usingAccount = email.trim() !== "" && password !== "";
+  const destinationHost = credentialDestination(baseUrl);
+  const isCustomDestination = destinationHost !== DEFAULT_API_HOST;
   const canConnect = !busy && !waitingBrowser && (usingToken ? !usingAccount : usingAccount);
 
   const stopWaiting = () => {
@@ -195,6 +215,11 @@ export function ConnectionSettings(props: {
                   credential — there is no key to copy. Your password is used for
                   this one request and is never stored.
                 </Typography>
+                <Alert severity={isCustomDestination ? "warning" : "info"}>
+                  {isCustomDestination
+                    ? `Your password will be sent to ${destinationHost} — not to ${DEFAULT_API_HOST}. Only continue if you run Decionis there.`
+                    : `Your password is sent only to ${destinationHost}.`}
+                </Alert>
                 <TextField
                   label="Email"
                   type="email"
