@@ -28,6 +28,10 @@ func main() {
 	listenAddr := flag.String("listen", ":8080", "address to serve the gate on")
 	baseURL := flag.String("base-url", "", "Decionis API base URL (default https://api.decionis.com)")
 	timeout := flag.Duration("timeout", 15*time.Second, "how long to wait for a verdict before denying")
+	decisionType := flag.String("decision-type", authority.DefaultToolCallDecisionType,
+		"decision type used when evaluating intercepted MCP tool calls")
+	forwardArguments := flag.Bool("forward-arguments", false,
+		"send intercepted tool-call argument VALUES to the control plane (names are always sent)")
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
@@ -52,8 +56,10 @@ func main() {
 	}
 
 	server := &http.Server{
-		Addr:              *listenAddr,
-		Handler:           authority.NewServer(authority.NewGate(client, *timeout), logger, version.Version).Handler(),
+		Addr: *listenAddr,
+		Handler: authority.NewServer(authority.NewGate(client, *timeout), logger, version.Version).
+			WithGatewayOptions(*decisionType, *forwardArguments).
+			Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,
