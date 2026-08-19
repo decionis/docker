@@ -232,4 +232,3 @@ func TestLoopbackHandlerServesNothingElse(t *testing.T) {
 		}
 	}
 }
-
