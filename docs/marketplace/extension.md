@@ -89,6 +89,17 @@ Later releases (same pipeline, same guarantees):
   no Username on Docker 29, and the only local alternative would mean
   reading the user's Docker Hub secret from the credential store, which
   this extension does not do.
+- 2026-08-20 `ext-v0.1.7` — the approvals panel and Claim workspace. The
+  panel lists the decisions held for human review, and keeps "nothing
+  waiting" distinct from "could not read", so an unreachable control plane
+  never reads as an empty queue. Claim workspace mints a short-lived claim
+  token and hands off to the browser, turning the first-run provisional
+  workspace into one owned by a real account without losing the decisions
+  already recorded in it. Requires decionis/Decionis#926 deployed
+  (2026-08-20) — the extension calls
+  `/v1/protocol/decisions/awaiting-approval` and
+  `/v1/docker-desktop/workspace/claim-token`; both were verified live
+  against production with an authenticated probe before this tag was cut.
 
 
 ## Before marketplace submission (Rule 1.1 gates)

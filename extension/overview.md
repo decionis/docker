@@ -70,7 +70,7 @@ install it directly (Docker Desktop → Settings → Extensions → allow
 non-marketplace extensions):
 
 ```bash
-docker extension install decionis/desktop-extension:0.1.6
+docker extension install decionis/desktop-extension:0.1.7
 ```
 
 Then open the **Decionis** tab. That is the whole setup: a workspace is
