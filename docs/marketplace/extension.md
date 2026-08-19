@@ -61,6 +61,16 @@ Later releases (same pipeline, same guarantees):
   extension's own public Docker Hub tags listing (anonymous, cached 6 h,
   fail-open — an unreachable listing claims nothing) and the UI shows a
   dismissible per-version banner with the `docker extension update` command.
+- 2026-08-19 `ext-v0.1.4` → `:0.1.4` — one-click connect: "Continue in
+  browser" starts the control plane's docker-desktop flow (sign-in +
+  auto-provision, RFC 8252 loopback redirect to the daemon's listener on
+  host `127.0.0.1:53719`, state-bound single-use `/enroll`, minted token
+  exchanged exactly like a pasted one). Also fixes the enrollment exchange
+  endpoint path (`/connectors/…` → `/v1/connectors/…`): pasted-token
+  connects against the hosted plane had been failing since 0.1.2 — earlier
+  test fakes mirrored the client's wrong path, so only a test that drove
+  the real HTTP client caught it. First release to arrive through the Hub
+  release webhook (announcement email to connected owners).
 
 ## Before marketplace submission (Rule 1.1 gates)
 

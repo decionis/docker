@@ -91,6 +91,10 @@ export interface DossierPayload {
   payload: Record<string, unknown>;
 }
 
+export interface ConnectStart {
+  authorize_url: string;
+}
+
 export interface UpdateInfo {
   current_version: string;
   latest_version?: string;
@@ -109,7 +113,7 @@ export class BackendError extends Error {
 }
 
 interface Transport {
-  request(method: "GET" | "PUT" | "DELETE", path: string, body?: unknown): Promise<unknown>;
+  request(method: "GET" | "POST" | "PUT" | "DELETE", path: string, body?: unknown): Promise<unknown>;
 }
 
 function parseErrorBody(status: number, body: unknown): BackendError {
@@ -130,6 +134,7 @@ function desktopTransport(): Transport | null {
       async request(method, path, body) {
         try {
           if (method === "GET") return await service.get(path);
+          if (method === "POST") return await service.post(path, body);
           if (method === "PUT") return await service.put(path, body);
           return await service.delete(path);
         } catch (raw) {
@@ -191,6 +196,23 @@ export class BackendClient {
       | { org_id: string; api_key: string; base_url?: string },
   ): Promise<DaemonStatus> {
     return this.transport.request("PUT", "/api/connection", input) as Promise<DaemonStatus>;
+  }
+
+  /** Starts a one-click connect; the returned URL opens in the browser. */
+  connectStart(baseUrl?: string): Promise<ConnectStart> {
+    const body = baseUrl && baseUrl.trim() ? { base_url: baseUrl.trim() } : {};
+    return this.transport.request("POST", "/api/connect/start", body) as Promise<ConnectStart>;
+  }
+
+  /** Opens a URL in the host browser (Docker Desktop) or a new tab (dev). */
+  openExternal(url: string): void {
+    try {
+      createDockerDesktopClient().host.openExternal(url);
+      return;
+    } catch {
+      // Outside Docker Desktop (vite dev): plain browser behavior.
+    }
+    window.open(url, "_blank", "noopener");
   }
 
   disconnect(): Promise<unknown> {

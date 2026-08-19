@@ -23,6 +23,7 @@ import (
 func main() {
 	socketPath := flag.String("socket", "/run/guest-services/backend.sock", "unix socket to serve the extension UI on")
 	listenAddr := flag.String("listen", "", "development override: loopback TCP address (e.g. 127.0.0.1:8787)")
+	loopbackAddr := flag.String("loopback", "", "TCP address for the one-click connect redirect listener (e.g. :53719); empty disables it")
 	dataDir := flag.String("data", "/data", "private directory for connection state")
 	flag.Parse()
 
@@ -46,12 +47,37 @@ func main() {
 		IdleTimeout:       60 * time.Second,
 	}
 
+	// The one-click connect listener: inside the extension VM the compose
+	// file publishes this port on the host's 127.0.0.1, where the browser's
+	// RFC 8252 redirect lands. It serves nothing but /enroll.
+	var loopbackServer *http.Server
+	if *loopbackAddr != "" {
+		loopbackServer = &http.Server{
+			Addr:              *loopbackAddr,
+			Handler:           d.LoopbackHandler(),
+			ReadHeaderTimeout: 5 * time.Second,
+			ReadTimeout:       15 * time.Second,
+			WriteTimeout:      30 * time.Second,
+			IdleTimeout:       60 * time.Second,
+		}
+		go func() {
+			logger.Info("one-click loopback listening", "on", *loopbackAddr)
+			if err := loopbackServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				// The main API stays up either way; one-click just won't work.
+				logger.Error("loopback listener stopped", "detail", err.Error())
+			}
+		}()
+	}
+
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-shutdown
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
+		if loopbackServer != nil {
+			_ = loopbackServer.Shutdown(ctx)
+		}
 		_ = server.Shutdown(ctx)
 	}()
 

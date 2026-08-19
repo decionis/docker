@@ -32,7 +32,7 @@ var (
 
 // ExchangeEnrollment redeems a single-use enrollment token at the control
 // plane's public, possession-authenticated exchange endpoint
-// (POST /connectors/enrollments/exchange) — the same mechanism Decionis
+// (POST /v1/connectors/enrollments/exchange) — the same mechanism Decionis
 // connectors use to self-provision credentials.
 func ExchangeEnrollment(ctx context.Context, baseURL, enrollmentToken string) (*EnrollmentExchange, error) {
 	normalizedBaseURL, err := ValidateBaseURL(baseURL)
@@ -48,7 +48,7 @@ func ExchangeEnrollment(ctx context.Context, baseURL, enrollmentToken string) (*
 		return nil, errors.New("decionis api: enrollment exchange: encode failed")
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		normalizedBaseURL+"/connectors/enrollments/exchange", bytes.NewReader(payload))
+		normalizedBaseURL+"/v1/connectors/enrollments/exchange", bytes.NewReader(payload))
 	if err != nil {
 		return nil, errors.New("decionis api: enrollment exchange: build request failed")
 	}

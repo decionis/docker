@@ -4,6 +4,7 @@ import AccordionDetails from "@mui/material/AccordionDetails";
 import AccordionSummary from "@mui/material/AccordionSummary";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
+import CircularProgress from "@mui/material/CircularProgress";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
@@ -11,15 +12,19 @@ import DialogTitle from "@mui/material/DialogTitle";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { BackendClient, BackendError, type DaemonStatus } from "../../services/BackendClient";
 
+const BROWSER_POLL_MS = 2_000;
+const BROWSER_WAIT_LIMIT_MS = 10 * 60_000; // matches the daemon's pending TTL
+
 /**
- * First-run connect: one pasted single-use enrollment token (the same
- * self-provisioning mechanism Decionis connectors use — exchanged once for a
- * scoped key the backend holds). Manual org ID + API key stays available
- * under Advanced. Nothing secret is persisted UI-side
+ * First-run connect. Primary path: one click — the browser signs the user
+ * in, the control plane mints a single-use enrollment token, and its
+ * loopback redirect lands on the daemon, which exchanges it for a scoped
+ * key only the backend holds. A pasted enrollment token and manual org ID +
+ * API key stay available. Nothing secret is persisted UI-side
  * (rules/security.rules.md Rule 2.3).
  */
 export function ConnectionSettings(props: {
@@ -35,12 +40,60 @@ export function ConnectionSettings(props: {
   const [baseUrl, setBaseUrl] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [waitingBrowser, setWaitingBrowser] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pollRef = useRef<number | null>(null);
 
   const connected = Boolean(props.status?.connected);
   const usingToken = enrollmentToken.trim() !== "";
   const usingManual = orgId.trim() !== "" && apiKey !== "";
-  const canConnect = !busy && (usingToken ? !usingManual : usingManual);
+  const canConnect = !busy && !waitingBrowser && (usingToken ? !usingManual : usingManual);
+
+  const stopWaiting = () => {
+    if (pollRef.current !== null) {
+      window.clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    setWaitingBrowser(false);
+  };
+
+  // Never leave a poll running once the dialog is gone.
+  useEffect(() => {
+    if (!props.open) stopWaiting();
+    return stopWaiting;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.open]);
+
+  const continueInBrowser = async () => {
+    setError(null);
+    try {
+      const started = await props.backend.connectStart(baseUrl);
+      props.backend.openExternal(started.authorize_url);
+      setWaitingBrowser(true);
+      const deadline = Date.now() + BROWSER_WAIT_LIMIT_MS;
+      pollRef.current = window.setInterval(() => {
+        void (async () => {
+          try {
+            const next = await props.backend.status();
+            if (next.connected) {
+              stopWaiting();
+              props.onChanged(next);
+              props.onClose();
+              return;
+            }
+          } catch {
+            // daemon briefly unreachable — keep waiting
+          }
+          if (Date.now() > deadline) {
+            stopWaiting();
+            setError("The browser sign-in didn't finish. Try again, or paste an enrollment token.");
+          }
+        })();
+      }, BROWSER_POLL_MS);
+    } catch (raw) {
+      setError(raw instanceof BackendError ? raw.message : "The Decionis daemon is not reachable.");
+    }
+  };
 
   const submit = async () => {
     setBusy(true);
@@ -89,9 +142,28 @@ export function ConnectionSettings(props: {
           {error && <Alert severity="error">{error}</Alert>}
 
           <Typography variant="body2" color="text.secondary">
-            Paste a single-use <strong>enrollment token</strong> from your Decionis organization.
-            It is exchanged once for a scoped credential that only the extension backend holds —
-            nothing is stored in this UI.
+            Sign in with your browser — your workspace is created on first sign-in and Docker
+            Desktop connects itself. The credential is minted server-side and held only by the
+            extension backend.
+          </Typography>
+          {waitingBrowser ? (
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <CircularProgress size={18} />
+              <Typography variant="body2">Waiting for the browser sign-in to finish…</Typography>
+              <Button size="small" onClick={stopWaiting}>
+                Cancel
+              </Button>
+            </Stack>
+          ) : (
+            <Button variant="contained" onClick={() => void continueInBrowser()} disabled={busy}>
+              Continue in browser
+            </Button>
+          )}
+
+          <Typography variant="body2" color="text.secondary" sx={{ pt: 1 }}>
+            Or paste a single-use <strong>enrollment token</strong> from your Decionis
+            organization. It is exchanged once for a scoped credential that only the extension
+            backend holds — nothing is stored in this UI.
           </Typography>
           <TextField
             label="Enrollment token"

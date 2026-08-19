@@ -31,7 +31,7 @@ func TestExchangeEnrollmentSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("exchange: %v", err)
 	}
-	if gotPath != "/connectors/enrollments/exchange" {
+	if gotPath != "/v1/connectors/enrollments/exchange" {
 		t.Fatalf("unexpected path %q", gotPath)
 	}
 	if gotToken != "dcn_enroll_0123456789abcdef" {

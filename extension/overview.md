@@ -70,14 +70,14 @@ install it directly (Docker Desktop → Settings → Extensions → allow
 non-marketplace extensions):
 
 ```bash
-docker extension install decionis/desktop-extension:0.1.3
+docker extension install decionis/desktop-extension:0.1.4
 ```
 
-Then open the **Decionis** tab, choose **Settings**, and paste a single-use
-**enrollment token** from your Decionis organization — it is exchanged once
-for a scoped credential held by the extension backend (org ID + API key
-remain available under Advanced). No credentials are needed until you
-connect.
+Then open the **Decionis** tab and press **Continue in browser** — sign in
+(your workspace is created on first sign-in) and Docker Desktop connects
+itself. A pasted single-use **enrollment token** and manual org ID + API
+key remain available under Settings. Every credential is minted
+server-side and held by the extension backend only.
 
 ## The local evaluator (no account required)
 
