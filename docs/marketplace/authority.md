@@ -70,6 +70,19 @@ Two flags shape what the control plane is told about intercepted calls:
   the tool name and argument *names* are always sent, which describes the
   shape of the action without its contents.
 
+## Docker Hub presence
+
+Repository `decionis/authority` (public, created by the owner 2026-08-19).
+Short description and overview are pasted from `cmd/authority-proxy/overview.md`
+— that committed file is the source of truth (Rule 2.1); never edit only in
+the Hub UI. Note the short description is capped at **100 characters**.
+
+A `decionis-release-announce` webhook points at the release receiver, so
+pushes are recorded. Authority releases are deliberately **recorded but not
+emailed**: the gate is infrastructure an operator deploys, while the email
+audience is people whose Docker Desktop workspace is connected — a
+different group.
+
 ## Release log
 
 | Date | Tag | Digest | Notes |
