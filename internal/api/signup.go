@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 )
 
 // Workspace is a connected workspace and the scoped key that reaches it.
@@ -41,48 +40,45 @@ var (
 // signed-in Hub user to extensions, and the only local source is the
 // credential store, which would mean reading the user's Hub secret to learn
 // a display name. The control plane then names the workspace itself.
-func ProvisionWorkspace(ctx context.Context, baseURL, dockerUsername string) (*Workspace, error) {
+func (c *Client) ProvisionWorkspace(ctx context.Context, dockerUsername string) (*Workspace, error) {
 	payload := map[string]string{}
 	if trimmed := strings.TrimSpace(dockerUsername); trimmed != "" {
 		payload["docker_username"] = trimmed
 	}
-	return postWorkspace(ctx, baseURL, "/v1/public/connect/docker-desktop/provision", payload)
+	return c.postWorkspace(ctx, "/v1/public/connect/docker-desktop/provision", payload)
 }
 
 // ConnectWithAccount resolves an account's email and password into its
 // workspace and a freshly minted scoped key. The password is used for this
 // one request and never stored — only the returned key is.
-func ConnectWithAccount(ctx context.Context, baseURL, email, password string) (*Workspace, error) {
+func (c *Client) ConnectWithAccount(ctx context.Context, email, password string) (*Workspace, error) {
 	payload := map[string]string{
 		"email":    strings.TrimSpace(email),
 		"password": password,
 	}
-	return postWorkspace(ctx, baseURL, "/v1/public/connect/docker-desktop/credentials", payload)
+	return c.postWorkspace(ctx, "/v1/public/connect/docker-desktop/credentials", payload)
 }
 
-func postWorkspace(
+// postWorkspace issues one pre-auth request.
+//
+// It takes no URL: the destination is the client's own base URL, already
+// normalized by ValidateBaseURL when the client was constructed (rebuilt
+// from parsed scheme + validated host + path; https off loopback;
+// credentials, query, and fragment rejected). `path` is a package constant.
+// The host stays operator-configurable on purpose — self-hosted control
+// planes — which is why the UI names the destination wherever a password is
+// typed.
+func (c *Client) postWorkspace(
 	ctx context.Context,
-	baseURL, path string,
+	path string,
 	payload map[string]string,
 ) (*Workspace, error) {
-	// Single transport gate (see ValidateBaseURL): the request URL is
-	// rebuilt from a parsed scheme, validated host, and path — https off
-	// loopback, and embedded credentials, query, and fragment are rejected.
-	// Only the normalized value reaches the network; `path` is a package
-	// constant. The host stays operator-configurable on purpose (self-hosted
-	// control planes), which is why the UI names the destination wherever a
-	// password is typed.
-	normalizedBaseURL, err := ValidateBaseURL(baseURL)
-	if err != nil {
-		return nil, err
-	}
-
 	encoded, err := json.Marshal(payload)
 	if err != nil {
 		return nil, errors.New("decionis api: workspace request: encode failed")
 	}
 	request, err := http.NewRequestWithContext(
-		ctx, http.MethodPost, normalizedBaseURL+path, bytes.NewReader(encoded),
+		ctx, http.MethodPost, c.config.BaseURL+path, bytes.NewReader(encoded),
 	)
 	if err != nil {
 		return nil, errors.New("decionis api: workspace request: build failed")
@@ -90,8 +86,7 @@ func postWorkspace(
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/json")
 
-	client := &http.Client{Timeout: 15 * time.Second}
-	response, err := client.Do(request)
+	response, err := c.httpClient.Do(request)
 	if err != nil {
 		return nil, ErrSignupUnavailable
 	}

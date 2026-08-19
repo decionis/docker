@@ -1,7 +1,6 @@
 package daemon
 
 import (
-	"context"
 	"io"
 	"log/slog"
 	"net/http"
@@ -35,33 +34,19 @@ func putJSON(d *Daemon, body string) *httptest.ResponseRecorder {
 	return rec
 }
 
-func stubProvision(t *testing.T, workspace *api.Workspace, err error) *string {
+func stubProvision(t *testing.T, workspace *api.Workspace, err error) *stubPublicAPI {
 	t.Helper()
-	original := provisionWorkspace
-	seenUsername := ""
-	provisionWorkspace = func(_ context.Context, _ string, username string) (*api.Workspace, error) {
-		seenUsername = username
-		return workspace, err
-	}
-	t.Cleanup(func() { provisionWorkspace = original })
-	return &seenUsername
+	return usePublicStub(t, &stubPublicAPI{workspace: workspace, workspaceErr: err})
 }
 
-func stubAccountConnect(t *testing.T, workspace *api.Workspace, err error) *[2]string {
+func stubAccountConnect(t *testing.T, workspace *api.Workspace, err error) *stubPublicAPI {
 	t.Helper()
-	original := connectWithAccount
-	var seen [2]string
-	connectWithAccount = func(_ context.Context, _ string, email, password string) (*api.Workspace, error) {
-		seen[0], seen[1] = email, password
-		return workspace, err
-	}
-	t.Cleanup(func() { connectWithAccount = original })
-	return &seen
+	return usePublicStub(t, &stubPublicAPI{workspace: workspace, workspaceErr: err})
 }
 
 func TestAutoConnectMintsAWorkspaceWithNoInput(t *testing.T) {
 	d := signupDaemon(t)
-	seenUsername := stubProvision(t, &api.Workspace{
+	stub := stubProvision(t, &api.Workspace{
 		OrgID: "11111111-1111-4111-8111-111111111111", RawKey: "dcn_live_x",
 		OrgName: "My Docker Workspace", Provisional: true,
 	}, nil)
@@ -76,8 +61,8 @@ func TestAutoConnectMintsAWorkspaceWithNoInput(t *testing.T) {
 	if strings.Contains(rec.Body.String(), "dcn_live_x") {
 		t.Fatal("status leaked the minted key")
 	}
-	if *seenUsername != "" {
-		t.Fatalf("no username should be sent by default, got %q", *seenUsername)
+	if stub.seenUsername != "" {
+		t.Fatalf("no username should be sent by default, got %q", stub.seenUsername)
 	}
 }
 
@@ -111,7 +96,7 @@ func TestAutoConnectStaysDisconnectedWhenSignupFails(t *testing.T) {
 
 func TestConnectWithEmailAndPassword(t *testing.T) {
 	d := signupDaemon(t)
-	seen := stubAccountConnect(t, &api.Workspace{
+	stub := stubAccountConnect(t, &api.Workspace{
 		OrgID: "11111111-1111-4111-8111-111111111111", RawKey: "dcn_live_y", OrgName: "Acme",
 	}, nil)
 
@@ -119,8 +104,8 @@ func TestConnectWithEmailAndPassword(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("credentials connect: got %d body %s", rec.Code, rec.Body.String())
 	}
-	if seen[0] != "owner@acme.test" || seen[1] != "correct horse" {
-		t.Fatalf("credentials not forwarded verbatim: %+v", *seen)
+	if stub.seenEmail != "owner@acme.test" || stub.seenPassword != "correct horse" {
+		t.Fatalf("credentials not forwarded verbatim: %q %q", stub.seenEmail, stub.seenPassword)
 	}
 	body := rec.Body.String()
 	if strings.Contains(body, "correct horse") || strings.Contains(body, "dcn_live_y") {

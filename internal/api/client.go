@@ -75,6 +75,40 @@ func localhostHost(rawURL string) bool {
 
 // NewClient validates the connection config. HTTPS is mandatory except for
 // localhost (development and tests) — rules/security.rules.md Rule 2.6.
+// NewPublicClient builds a client for the calls that happen BEFORE any
+// credential exists: automatic signup, account sign-in, and enrollment
+// exchange. It carries no org id and no API key.
+//
+// It exists so that no function in this package takes a base URL as a
+// parameter. The URL is validated once, here, and afterwards only the
+// client's own normalized value is used to build requests — the raw
+// caller-supplied string never travels alongside the request-building code.
+func NewPublicClient(baseURL string) (*Client, error) {
+	normalizedBaseURL, err := ValidateBaseURL(baseURL)
+	if err != nil {
+		return nil, err
+	}
+	return &Client{
+		config:     Config{BaseURL: normalizedBaseURL},
+		httpClient: newHTTPClient(),
+	}, nil
+}
+
+// newHTTPClient is the shared outbound transport policy: bounded dial,
+// handshake, and response timeouts so no call can hang indefinitely.
+func newHTTPClient() *http.Client {
+	return &http.Client{
+		Timeout: 15 * time.Second,
+		Transport: &http.Transport{
+			DialContext:           (&net.Dialer{Timeout: 5 * time.Second}).DialContext,
+			TLSHandshakeTimeout:   5 * time.Second,
+			ResponseHeaderTimeout: 15 * time.Second,
+			IdleConnTimeout:       5 * time.Second,
+			MaxIdleConns:          4,
+		},
+	}
+}
+
 func NewClient(config Config) (*Client, error) {
 	normalizedBaseURL, err := ValidateBaseURL(config.BaseURL)
 	if err != nil {
@@ -87,19 +121,7 @@ func NewClient(config Config) (*Client, error) {
 	if strings.TrimSpace(config.APIKey) == "" {
 		return nil, errors.New("api key is required")
 	}
-	return &Client{
-		config: config,
-		httpClient: &http.Client{
-			Timeout: 15 * time.Second,
-			Transport: &http.Transport{
-				DialContext:           (&net.Dialer{Timeout: 5 * time.Second}).DialContext,
-				TLSHandshakeTimeout:   5 * time.Second,
-				ResponseHeaderTimeout: 15 * time.Second,
-				IdleConnTimeout:       5 * time.Second,
-				MaxIdleConns:          4,
-			},
-		},
-	}, nil
+	return &Client{config: config, httpClient: newHTTPClient()}, nil
 }
 
 // BaseURL returns the validated origin (no credentials by construction).

@@ -13,11 +13,21 @@ import (
 	"github.com/decionis/docker/internal/store"
 )
 
+// publicAPI is the pre-auth surface: the calls made before any credential
+// exists. It takes no URLs — the client it comes from was built with a
+// validated base URL, so a raw caller-supplied string never reaches
+// request construction.
+type publicAPI interface {
+	ProvisionWorkspace(ctx context.Context, dockerUsername string) (*api.Workspace, error)
+	ConnectWithAccount(ctx context.Context, email, password string) (*api.Workspace, error)
+	ExchangeEnrollment(ctx context.Context, enrollmentToken string) (*api.EnrollmentExchange, error)
+}
+
+// newPublicClient validates the base URL and returns the pre-auth surface.
 // Swapped in tests.
-var (
-	provisionWorkspace = api.ProvisionWorkspace
-	connectWithAccount = api.ConnectWithAccount
-)
+var newPublicClient = func(baseURL string) (publicAPI, error) {
+	return api.NewPublicClient(baseURL)
+}
 
 type autoConnectRequest struct {
 	BaseURL        string `json:"base_url"`
@@ -50,16 +60,17 @@ func (d *Daemon) handleAutoConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	baseURL, err := api.ValidateBaseURL(request.BaseURL)
+	client, err := newPublicClient(request.BaseURL)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
+	baseURL := clientBaseURL(client, request.BaseURL)
 
 	ctx, cancel := context.WithTimeout(r.Context(), upstreamTimeout)
 	defer cancel()
 
-	workspace, err := provisionWorkspace(ctx, baseURL, request.DockerUsername)
+	workspace, err := client.ProvisionWorkspace(ctx, request.DockerUsername)
 	if err != nil {
 		d.logger.Info("automatic signup failed")
 		writeError(w, http.StatusBadGateway, "signup_unavailable",
@@ -84,11 +95,12 @@ func (d *Daemon) handleAutoConnect(w http.ResponseWriter, r *http.Request) {
 // in this request: it is never written to the store, never logged, and never
 // returned to the UI.
 func (d *Daemon) connectWithCredentials(w http.ResponseWriter, r *http.Request, request connectRequest) {
-	baseURL, err := api.ValidateBaseURL(request.BaseURL)
+	client, err := newPublicClient(request.BaseURL)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
+	baseURL := clientBaseURL(client, request.BaseURL)
 	if strings.TrimSpace(request.Email) == "" || request.Password == "" {
 		writeError(w, http.StatusBadRequest, "invalid_request", "Both email and password are required.")
 		return
@@ -97,7 +109,7 @@ func (d *Daemon) connectWithCredentials(w http.ResponseWriter, r *http.Request, 
 	ctx, cancel := context.WithTimeout(r.Context(), upstreamTimeout)
 	defer cancel()
 
-	workspace, err := connectWithAccount(ctx, baseURL, request.Email, request.Password)
+	workspace, err := client.ConnectWithAccount(ctx, request.Email, request.Password)
 	if err != nil {
 		switch {
 		case errors.Is(err, api.ErrCredentialsInvalid):
@@ -168,4 +180,18 @@ func (d *Daemon) storeWorkspace(ctx context.Context, baseURL string, workspace *
 		d.mu.Unlock()
 	}
 	return ""
+}
+
+// clientBaseURL reports the normalized destination for storage. It prefers
+// the client's own validated value and falls back to re-validating the raw
+// input, so what is stored is always the normalized form.
+func clientBaseURL(client publicAPI, raw string) string {
+	if real, ok := client.(*api.Client); ok {
+		return real.BaseURL()
+	}
+	normalized, err := api.ValidateBaseURL(raw)
+	if err != nil {
+		return api.DefaultBaseURL
+	}
+	return normalized
 }

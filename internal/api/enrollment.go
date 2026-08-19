@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 )
 
 // EnrollmentExchange is the result of exchanging a single-use connector
@@ -34,11 +33,10 @@ var (
 // plane's public, possession-authenticated exchange endpoint
 // (POST /v1/connectors/enrollments/exchange) — the same mechanism Decionis
 // connectors use to self-provision credentials.
-func ExchangeEnrollment(ctx context.Context, baseURL, enrollmentToken string) (*EnrollmentExchange, error) {
-	normalizedBaseURL, err := ValidateBaseURL(baseURL)
-	if err != nil {
-		return nil, err
-	}
+// It takes no URL: the destination is the client's own base URL, already
+// normalized by ValidateBaseURL at construction, so no caller-supplied
+// string travels beside the request-building code.
+func (c *Client) ExchangeEnrollment(ctx context.Context, enrollmentToken string) (*EnrollmentExchange, error) {
 	if len(strings.TrimSpace(enrollmentToken)) < 20 {
 		return nil, ErrEnrollmentInvalid
 	}
@@ -48,15 +46,14 @@ func ExchangeEnrollment(ctx context.Context, baseURL, enrollmentToken string) (*
 		return nil, errors.New("decionis api: enrollment exchange: encode failed")
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		normalizedBaseURL+"/v1/connectors/enrollments/exchange", bytes.NewReader(payload))
+		c.config.BaseURL+"/v1/connectors/enrollments/exchange", bytes.NewReader(payload))
 	if err != nil {
 		return nil, errors.New("decionis api: enrollment exchange: build request failed")
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/json")
 
-	client := &http.Client{Timeout: 15 * time.Second}
-	response, err := client.Do(request)
+	response, err := c.httpClient.Do(request)
 	if err != nil {
 		return nil, errors.New("decionis api: enrollment exchange unreachable")
 	}

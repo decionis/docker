@@ -265,9 +265,6 @@ type connectRequest struct {
 	Password string `json:"password"`
 }
 
-// exchangeEnrollment is swapped in tests.
-var exchangeEnrollment = api.ExchangeEnrollment
-
 func (d *Daemon) handleConnect(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
 	decoder := json.NewDecoder(r.Body)

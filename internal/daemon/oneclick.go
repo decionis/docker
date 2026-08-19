@@ -154,7 +154,11 @@ func (d *Daemon) handleEnrollRedirect(w http.ResponseWriter, r *http.Request) {
 // and swaps the live client — the shared core of the pasted-token and
 // one-click paths. It returns "" on success or a stable error code.
 func (d *Daemon) establishFromEnrollment(ctx context.Context, baseURL, token string) string {
-	exchange, err := exchangeEnrollment(ctx, baseURL, token)
+	publicClient, err := newPublicClient(baseURL)
+	if err != nil {
+		return "invalid_base_url"
+	}
+	exchange, err := publicClient.ExchangeEnrollment(ctx, token)
 	if err != nil {
 		switch {
 		case errors.Is(err, api.ErrEnrollmentInvalid):
