@@ -98,12 +98,12 @@ Setup status — **LIVE end to end (2026-08-19)**:
 3. **Done** — Hub webhooks created (2026-08-19) on both repositories:
    `decionis-release-announce` on `decionis/desktop-extension` and
    `decionis/mcp`, pointing at the tokened receiver URL.
-4. Remaining verification happens on the next release tag: check the
-   webhook's delivery history on Hub (expect HTTP 200) and the
-   `docker_hub_release_announcements` row (recipient count). (The
-   447a030e pipeline's one hiccup — a `decionis-agentops` rollout timeout,
-   unrelated to this feature — cleared on rerun; the full pipeline is
-   green.)
+4. **Verified live (2026-08-19, ext-v0.1.4):** the tag push produced seven
+   Hub deliveries, all `success 200` — one carried tag `0.1.4` and won the
+   `(repo, tag)` claim (single announcement email), the rest landed as
+   ignored/duplicate exactly as designed. (The 447a030e pipeline's one
+   hiccup — a `decionis-agentops` rollout timeout, unrelated — cleared on
+   rerun.)
 
 The in-product update banner (extension ≥ 0.1.3) works independently of
 this: it needs no webhook, no credentials, and no deploy.
