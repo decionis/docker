@@ -100,10 +100,10 @@ Setup status — **LIVE end to end (2026-08-19)**:
    `decionis/mcp`, pointing at the tokened receiver URL.
 4. Remaining verification happens on the next release tag: check the
    webhook's delivery history on Hub (expect HTTP 200) and the
-   `docker_hub_release_announcements` row (recipient count). Known open
-   item: the 447a030e pipeline's `decionis-agentops` rollout timed out
-   (unrelated workload; api/worker/web/protocol all rolled out) — rerun
-   triggered, check its outcome.
+   `docker_hub_release_announcements` row (recipient count). (The
+   447a030e pipeline's one hiccup — a `decionis-agentops` rollout timeout,
+   unrelated to this feature — cleared on rerun; the full pipeline is
+   green.)
 
 The in-product update banner (extension ≥ 0.1.3) works independently of
 this: it needs no webhook, no credentials, and no deploy.
