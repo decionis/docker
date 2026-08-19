@@ -70,14 +70,20 @@ install it directly (Docker Desktop → Settings → Extensions → allow
 non-marketplace extensions):
 
 ```bash
-docker extension install decionis/desktop-extension:0.1.4
+docker extension install decionis/desktop-extension:0.1.5
 ```
 
-Then open the **Decionis** tab and press **Continue in browser** — sign in
-(your workspace is created on first sign-in) and Docker Desktop connects
-itself. A pasted single-use **enrollment token** and manual org ID + API
-key remain available under Settings. Every credential is minted
-server-side and held by the extension backend only.
+Then open the **Decionis** tab. That is the whole setup: a workspace is
+created for you on first run and the decision feed is live — no account,
+no sign-in, nothing to paste. Already have a Decionis account? Open
+Settings and sign in with your email and password; Decionis finds your
+workspace and issues the extension its own credential, so there is no
+workspace ID or API key to copy. Every credential is minted server-side
+and held by the extension backend only.
+
+**Shadow by default.** Decionis records decisions and gates nothing until
+you tick **Enforce decisions**. A new workspace includes 25 free governed
+(enforcing) decisions; shadow evaluations are unlimited.
 
 ## The local evaluator (no account required)
 

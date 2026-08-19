@@ -44,16 +44,4 @@ LABEL org.opencontainers.image.title="Decionis" \
     com.docker.extension.publisher-url="https://decionis.com" \
     com.docker.extension.additional-urls="[{\"title\":\"Documentation\",\"url\":\"https://decionis.com/docs/protocol-mcp\"},{\"title\":\"Repository\",\"url\":\"https://github.com/decionis/docker\"}]" \
     com.docker.extension.categories="security" \
-    com.docker.extension.changelog="<p>0.1.4: one-click connect — sign in with your browser and the extension connects itself (workspace auto-created on first sign-in); also fixes the enrollment-token exchange endpoint path. 0.1.3: update banner. 0.1.2: connect with a single-use enrollment token. Initial preview: live decision evaluations, decision summary, offline Ed25519 dossier verification, reproducibility posture.</p>"
-
-COPY extension/metadata.json /metadata.json
-COPY extension/icon.svg /icon.svg
-COPY extension/decionis-logo.png /decionis-logo.png
-COPY extension/compose.yaml /compose.yaml
-COPY --from=ui-build /ui/build /ui
-COPY --from=daemon-build /backend /backend
-
-# Runs as root inside the extension VM: required today to bind the
-# /run/guest-services extension socket; enumerated and justified in
-# SECURITY.md (rules/security.rules.md Rule 4.1).
-CMD ["/backend", "-socket", "/run/guest-services/backend.sock", "-data", "/data"]
+    com.docker.extension.changelog="<p>0.1.5: works the moment you install it — a workspace is created automatically on first run, so the decision feed is live with no account and no sign-in. Enforcement is now a checkbox (shadow by default) with 25 free governed decisions; shadow evaluations stay unlimited. Already have a Decionis account? Sign in with your email and password — no workspace ID or API key to copy. 0.1.4: one-click connect. 0.1.3: update banner. 0.1.2: enrollment-token connect. Initial preview: live decision evaluations, decision summary, offline Ed25519 dossier verification, reproducibility posture.</p>"
