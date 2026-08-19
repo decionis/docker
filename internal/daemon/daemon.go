@@ -141,6 +141,8 @@ func (d *Daemon) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/connection", d.handleDisconnect)
 	mux.HandleFunc("GET /api/workspace", d.handleWorkspace)
 	mux.HandleFunc("PUT /api/workspace/enforcement", d.handleEnforcement)
+	mux.HandleFunc("POST /api/workspace/claim", d.handleClaimStart)
+	mux.HandleFunc("GET /api/approvals", d.handleApprovals)
 	mux.HandleFunc("GET /api/decisions", d.handleDecisions)
 	mux.HandleFunc("GET /api/dossiers/{id}", d.handleDossier)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

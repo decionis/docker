@@ -9,6 +9,7 @@ import { DecisionFeed } from "./features/decisions/DecisionFeed";
 import { SummaryStrip } from "./features/decisions/SummaryStrip";
 import { DossierInspector } from "./features/dossiers/DossierInspector";
 import { EnforcementControl } from "./features/connection/EnforcementControl";
+import { ApprovalsPanel } from "./features/decisions/ApprovalsPanel";
 import type { ReportMode } from "./protocol/VerdictLabels";
 import {
   BackendClient,
@@ -16,6 +17,7 @@ import {
   type DaemonStatus,
   type DecisionsPayload,
   type UpdateInfo,
+  type PendingApproval,
   type WorkspaceState,
 } from "./services/BackendClient";
 import {
@@ -36,6 +38,8 @@ export function App() {
   const [inspectedDossierId, setInspectedDossierId] = useState<string | null>(null);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [workspace, setWorkspace] = useState<WorkspaceState | null>(null);
+  const [approvals, setApprovals] = useState<PendingApproval[] | null>(null);
+  const [approvalsError, setApprovalsError] = useState<string | null>(null);
   const [dismissedUpdate, setDismissedUpdate] = useState<string | null>(() => readDismissedVersion());
   const pollRef = useRef<number | null>(null);
   const autoSignupTried = useRef(false);
@@ -102,6 +106,21 @@ export function App() {
       .workspace()
       .then(setWorkspace)
       .catch(() => setWorkspace(null)); // an older plane simply has nothing to say
+
+    backend
+      .approvals()
+      .then((payload) => {
+        setApprovals(payload.approvals ?? []);
+        setApprovalsError(null);
+      })
+      .catch((raw) => {
+        // Never fall back to an empty list: an unreadable queue must not
+        // look like an empty one.
+        setApprovals(null);
+        setApprovalsError(
+          raw instanceof BackendError ? raw.message : "The Decionis daemon is not reachable.",
+        );
+      });
   }, [status?.connected, backend, decisions]);
 
   useEffect(() => {
@@ -145,6 +164,10 @@ export function App() {
 
         {status?.connected && workspace && (
           <EnforcementControl backend={backend} workspace={workspace} onChanged={setWorkspace} />
+        )}
+
+        {status?.connected && (approvals !== null || approvalsError) && (
+          <ApprovalsPanel approvals={approvals} error={approvalsError} />
         )}
 
         {status?.connected && decisions && <SummaryStrip summary={decisions.response.summary} />}
