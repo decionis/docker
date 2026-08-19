@@ -47,20 +47,29 @@ export function ApprovalsPanel(props: {
       </Stack>
       <Stack spacing={1.25}>
         {props.approvals.map((approval) => (
-          <Box key={approval.id}>
+          <Box key={approval.evaluation_id}>
             <Stack direction="row" spacing={1} alignItems="center">
-              {/* Severity is the control plane's word, shown verbatim. */}
+              {/* The protocol's own outcome word, never re-labelled here. */}
               <Chip
                 size="small"
-                label={approval.severity || "unspecified"}
-                color={approval.severity === "urgent" ? "error" : "default"}
-                variant={approval.severity === "urgent" ? "filled" : "outlined"}
+                label={approval.outcome}
+                color={approval.outcome === "ESCALATE" ? "error" : "warning"}
+                variant={approval.outcome === "ESCALATE" ? "filled" : "outlined"}
               />
-              <Typography variant="body2">{approval.decision_domain || "—"}</Typography>
+              <Typography variant="body2">{approval.decision_type || "—"}</Typography>
+              {approval.override_status && (
+                <Chip size="small" variant="outlined" label={`override ${approval.override_status}`} />
+              )}
             </Stack>
             <Typography variant="caption" color="text.secondary">
-              {approval.trigger_reason || "No reason given."}
-              {approval.surfaced_at ? ` · surfaced ${approval.surfaced_at}` : ""}
+              {[
+                approval.channel,
+                approval.amount ? `amount ${approval.amount}` : null,
+                approval.policy_version ? `policy ${approval.policy_version}` : null,
+                approval.created_at,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </Typography>
           </Box>
         ))}

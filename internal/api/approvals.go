@@ -6,36 +6,44 @@ import (
 	"strconv"
 )
 
-// PendingApproval is one entry awaiting a person's attention, as published
-// by the control plane's signal queue. Fields are rendered as returned;
-// nothing here re-scores or re-labels them.
+// PendingApproval is one decision still waiting on a person: an outcome the
+// policy did not approve, with nothing settled against it yet. Fields are
+// rendered as the protocol returns them — nothing here re-labels an
+// ESCALATE as a REVIEW, or re-scores anything.
 type PendingApproval struct {
-	ID             string `json:"id"`
-	Status         string `json:"status"`
-	Severity       string `json:"severity"`
-	DecisionDomain string `json:"decision_domain"`
-	TriggerReason  string `json:"trigger_reason"`
-	DecisionID     string `json:"decision_id"`
-	SurfacedAt     string `json:"surfaced_at"`
-	ExpiresAt      string `json:"expires_at"`
+	EvaluationID   string  `json:"evaluation_id"`
+	DecisionType   string  `json:"decision_type"`
+	Outcome        string  `json:"outcome"`
+	Mode           string  `json:"mode"`
+	PolicyVersion  string  `json:"policy_version"`
+	Amount         *string `json:"amount"`
+	Channel        *string `json:"channel"`
+	DossierID      *string `json:"dossier_id"`
+	CreatedAt      string  `json:"created_at"`
+	OverrideStatus *string `json:"override_status"`
 }
 
-// ListPendingApprovals reads the org's queue of entries still awaiting
-// review (GET /v1/signals/queue). The extension's scoped key carries
-// `signals:read`, which is what this route requires.
+type awaitingApprovalResponse struct {
+	OrgID    string            `json:"org_id"`
+	Count    int               `json:"count"`
+	Awaiting []PendingApproval `json:"awaiting"`
+}
+
+// ListPendingApprovals reads the decisions awaiting a person
+// (GET /v1/protocol/decisions/awaiting-approval). The extension's scoped key
+// carries `decision:read`, which is what this route requires.
 func (c *Client) ListPendingApprovals(ctx context.Context, limit int) ([]PendingApproval, error) {
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
 	query := url.Values{}
 	query.Set("org_id", c.config.OrgID)
-	query.Set("status", "pending")
 	query.Set("limit", strconv.Itoa(limit))
-	requestURL := c.config.BaseURL + "/v1/signals/queue?" + query.Encode()
+	requestURL := c.config.BaseURL + "/v1/protocol/decisions/awaiting-approval?" + query.Encode()
 
-	var approvals []PendingApproval
-	if err := c.getJSON(ctx, "signal queue", requestURL, 1<<20, &approvals); err != nil {
+	var response awaitingApprovalResponse
+	if err := c.getJSON(ctx, "awaiting approval", requestURL, 1<<20, &response); err != nil {
 		return nil, err
 	}
-	return approvals, nil
+	return response.Awaiting, nil
 }
