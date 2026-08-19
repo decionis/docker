@@ -79,22 +79,31 @@ Security shape (Hub webhooks carry **no signature**):
   double-fires idempotent (at most one email per release);
 - unsubscribe links carry opaque tokens, never the address.
 
-Setup status (2026-08-18):
+Setup status — **LIVE end to end (2026-08-19)**:
 
-1. **Done** — `DOCKER_HUB_WEBHOOK_TOKEN` is set as a GitHub **environment
-   secret** on `decionis/Decionis`'s `production` environment (repo secret
-   slots are exhausted), and the Deploy-to-GKE job forwards it into the api
-   runtime alongside the SendGrid pair (PR #910 @ 1a3abf99). The same value
-   is stashed in the owner's macOS keychain for the Hub-side step:
+1. **Done** — `DOCKER_HUB_WEBHOOK_TOKEN` is a GitHub **environment secret**
+   on `decionis/Decionis`'s `production` environment (repo secret slots are
+   exhausted); the Deploy-to-GKE job forwards it into the api runtime. The
+   same value sits in the owner's macOS keychain:
    `security find-generic-password -a decionis -s decionis-docker-hub-webhook-token -w`
-2. Pending the #910 merge + deploy (migration `0132` runs in the pipeline):
-   on hub.docker.com, open each repository → **Webhooks** and create one
-   webhook per repo pointing at
-   `https://api.decionis.com/v1/public/webhooks/docker-hub/<token>`
-   (repos: `decionis/desktop-extension`, `decionis/mcp`).
-3. Verify: push the next release tag and check the webhook's delivery
-   history on Hub (expect HTTP 200) and the
-   `docker_hub_release_announcements` row (recipient count).
+2. **Done** — receiver deployed: the webhook code missed #910's merge
+   snapshot by minutes and shipped as decionis/Decionis#914 (squash
+   3061cd24; migration `0132` applied by the pipeline). A production 401
+   was then found in front of ALL `/v1/public` docker-desktop routes — the
+   auth hook's `PublicPaths` allowlist never listed them (this also broke
+   #910's one-click connect flow live) — fixed in decionis/Decionis#915
+   (squash 447a030e). Post-deploy probes verified: connect start → 302 to
+   sign-in; wrong webhook token → 404 `not_found`; real token + bogus repo
+   → 200 `ignored_repo`; unsubscribe → 200.
+3. **Done** — Hub webhooks created (2026-08-19) on both repositories:
+   `decionis-release-announce` on `decionis/desktop-extension` and
+   `decionis/mcp`, pointing at the tokened receiver URL.
+4. Remaining verification happens on the next release tag: check the
+   webhook's delivery history on Hub (expect HTTP 200) and the
+   `docker_hub_release_announcements` row (recipient count). Known open
+   item: the 447a030e pipeline's `decionis-agentops` rollout timed out
+   (unrelated workload; api/worker/web/protocol all rolled out) — rerun
+   triggered, check its outcome.
 
 The in-product update banner (extension ≥ 0.1.3) works independently of
 this: it needs no webhook, no credentials, and no deploy.
