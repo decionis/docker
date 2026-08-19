@@ -8,6 +8,7 @@ import { StatusHeader } from "./features/connection/StatusHeader";
 import { DecisionFeed } from "./features/decisions/DecisionFeed";
 import { SummaryStrip } from "./features/decisions/SummaryStrip";
 import { DossierInspector } from "./features/dossiers/DossierInspector";
+import { EnforcementControl } from "./features/connection/EnforcementControl";
 import type { ReportMode } from "./protocol/VerdictLabels";
 import {
   BackendClient,
@@ -15,6 +16,7 @@ import {
   type DaemonStatus,
   type DecisionsPayload,
   type UpdateInfo,
+  type WorkspaceState,
 } from "./services/BackendClient";
 import {
   dismissUpdateVersion,
@@ -33,6 +35,7 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [inspectedDossierId, setInspectedDossierId] = useState<string | null>(null);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [workspace, setWorkspace] = useState<WorkspaceState | null>(null);
   const [dismissedUpdate, setDismissedUpdate] = useState<string | null>(() => readDismissedVersion());
   const pollRef = useRef<number | null>(null);
   const autoSignupTried = useRef(false);
@@ -92,6 +95,17 @@ export function App() {
 
   useEffect(() => {
     if (!status?.connected) {
+      setWorkspace(null);
+      return;
+    }
+    backend
+      .workspace()
+      .then(setWorkspace)
+      .catch(() => setWorkspace(null)); // an older plane simply has nothing to say
+  }, [status?.connected, backend, decisions]);
+
+  useEffect(() => {
+    if (!status?.connected) {
       setDecisions(null);
       return;
     }
@@ -128,6 +142,10 @@ export function App() {
         )}
 
         {feedError && <Alert severity="error">{feedError}</Alert>}
+
+        {status?.connected && workspace && (
+          <EnforcementControl backend={backend} workspace={workspace} onChanged={setWorkspace} />
+        )}
 
         {status?.connected && decisions && <SummaryStrip summary={decisions.response.summary} />}
 

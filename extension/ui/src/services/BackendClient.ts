@@ -95,6 +95,20 @@ export interface ConnectStart {
   authorize_url: string;
 }
 
+export interface WorkspaceState {
+  enforcement_enabled: boolean;
+  enforcement_available: boolean;
+  enforcement_reverted: boolean;
+  governed_used: number;
+  governed_limit: number | null;
+  remaining: number | null;
+  warn_at: number;
+  warn: boolean;
+  at_cap: boolean;
+  provisional: boolean;
+  subscribe_url: string;
+}
+
 export interface UpdateInfo {
   current_version: string;
   latest_version?: string;
@@ -223,6 +237,18 @@ export class BackendClient {
       // Outside Docker Desktop (vite dev): plain browser behavior.
     }
     window.open(url, "_blank", "noopener");
+  }
+
+  /** Enforcement state and the free governed-decision allowance. */
+  workspace(): Promise<WorkspaceState> {
+    return this.transport.request("GET", "/api/workspace") as Promise<WorkspaceState>;
+  }
+
+  /** Turns enforcement on or off. Throws BackendError on refusal. */
+  setEnforcement(enabled: boolean): Promise<WorkspaceState> {
+    return this.transport.request("PUT", "/api/workspace/enforcement", {
+      enabled,
+    }) as Promise<WorkspaceState>;
   }
 
   disconnect(): Promise<unknown> {
