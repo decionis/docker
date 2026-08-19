@@ -73,6 +73,31 @@ An adapter endpoint is therefore required, and it must invert the habit:
   (`isError` plus the outcome and reason), which the caller sees in place
   of the tool's output
 
+## Verified end to end (2026-08-19)
+
+The adapter (`POST /v1/mcp/before-tool-call`) was exercised against a real
+`docker mcp gateway run --servers time` with
+`--interceptor before:http:http://127.0.0.1:9098/v1/mcp/before-tool-call`,
+backed by a fake control plane:
+
+- **Approved** — the plane returned APPROVE, the adapter wrote an empty
+  body, and the tool ran: `{"timezone":"UTC","datetime":"2026-08-19T…"}`.
+- **Refused** — the plane returned REJECT and the tool did **not** run. The
+  agent received instead:
+  `Decionis did not authorize get_current_time. Outcome: REJECT. clock
+  reads are restricted by policy Decision dossier: dos-gw.`
+
+So enforcement genuinely rides the gateway; a refusal replaces the tool's
+output rather than merely being logged.
+
+What the adapter sent upstream in that run, showing the withheld values:
+
+```json
+{"decision_type":"agent-action","channel":"get_current_time",
+ "context":{"source":"docker-mcp-gateway","tool_name":"get_current_time",
+            "argument_names":["timezone"]}}
+```
+
 ## Other constraints worth designing around
 
 - **No authentication.** No headers are set on the request at all, so the

@@ -19,16 +19,36 @@ type Server struct {
 	gate    *Gate
 	logger  *slog.Logger
 	version string
+
+	// Gateway-adapter behaviour: which decision type intercepted tool calls
+	// are evaluated as, and whether their argument values are forwarded.
+	decisionType     string
+	forwardArguments bool
 }
 
 func NewServer(gate *Gate, logger *slog.Logger, version string) *Server {
-	return &Server{gate: gate, logger: logger, version: version}
+	return &Server{gate: gate, logger: logger, version: version, decisionType: DefaultToolCallDecisionType}
+}
+
+// DefaultToolCallDecisionType is how an intercepted MCP tool call is
+// described to the control plane unless configured otherwise.
+const DefaultToolCallDecisionType = "agent-action"
+
+// WithGatewayOptions configures the Docker MCP Gateway adapter.
+func (s *Server) WithGatewayOptions(decisionType string, forwardArguments bool) *Server {
+	if decisionType != "" {
+		s.decisionType = decisionType
+	}
+	s.forwardArguments = forwardArguments
+	return s
 }
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 	mux.HandleFunc("POST /v1/gate", s.handleGate)
+	// Docker MCP Gateway before:http: interceptor (different dialect — see gateway.go).
+	mux.HandleFunc("POST /v1/mcp/before-tool-call", s.handleGatewayBefore)
 	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusNotFound, Decision{
 			Allowed: false, Code: "not_found",
