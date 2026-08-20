@@ -2,19 +2,23 @@ import type { DemoEvaluationResult } from "../../services/BackendClient";
 
 export interface DemoCounts {
   approve: number;
-  block: number;
+  reject: number;
   escalate: number;
+  review: number;
 }
 
-/** Counts only exact control-plane answers; intended lanes never count as results. */
+/**
+ * Counts only exact control-plane outcomes, one bucket per published enum
+ * value (APPROVE / REJECT / ESCALATE / REVIEW); intended lanes never count as
+ * results, and no result is ever counted twice.
+ */
 export function summarizeDemoResults(results: DemoEvaluationResult[]): DemoCounts {
-  return results.reduce<DemoCounts>(
-    (counts, result) => {
-      if (result.outcome === "APPROVE") counts.approve += 1;
-      if (result.outcome === "REJECT" || result.execution_action === "BLOCK") counts.block += 1;
-      if (result.outcome === "ESCALATE" || result.outcome === "REVIEW") counts.escalate += 1;
-      return counts;
-    },
-    { approve: 0, block: 0, escalate: 0 },
-  );
+  const counts: DemoCounts = { approve: 0, reject: 0, escalate: 0, review: 0 };
+  for (const result of results) {
+    if (result.outcome === "APPROVE") counts.approve += 1;
+    if (result.outcome === "REJECT") counts.reject += 1;
+    if (result.outcome === "ESCALATE") counts.escalate += 1;
+    if (result.outcome === "REVIEW") counts.review += 1;
+  }
+  return counts;
 }

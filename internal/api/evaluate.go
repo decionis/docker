@@ -23,17 +23,19 @@ type ActionDescriptor struct {
 
 // Verdict is the control plane's answer, rendered exactly as returned. The
 // vocabulary belongs to the protocol (APPROVE / REJECT / REVIEW / ESCALATE);
-// nothing here translates or re-scores it.
+// nothing here translates or re-scores it. Only fields the published
+// evaluate-decision contract returns are decoded — execution_action and
+// would_execute belong to the shadow *reports* contract, not this one.
+// Reason is not in the current contract either: it decodes empty and callers
+// must treat "" as absent (the authority gate substitutes its own sentences).
 type Verdict struct {
-	Outcome         string  `json:"outcome"`
-	Confidence      float64 `json:"confidence"`
-	PolicyVersion   string  `json:"policy_version"`
-	Mode            string  `json:"mode"`
-	Reason          string  `json:"reason"`
-	ExecutionAction string  `json:"execution_action"`
-	EvaluationID    string  `json:"evaluation_id"`
-	DossierID       string  `json:"dossier_id"`
-	WouldExecute    bool    `json:"would_execute"`
+	Outcome       string  `json:"outcome"`
+	Confidence    float64 `json:"confidence"`
+	PolicyVersion string  `json:"policy_version"`
+	Mode          string  `json:"mode"`
+	Reason        string  `json:"reason"`
+	EvaluationID  string  `json:"evaluation_id"`
+	DossierID     string  `json:"dossier_id"`
 }
 
 // ErrEvaluationRefused means the control plane declined to evaluate — an

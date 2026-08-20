@@ -3,41 +3,53 @@ import { describe, expect, it } from "vitest";
 import { summarizeDemoResults } from "../src/features/demo/DemoPolicyResults";
 import type { DemoEvaluationResult } from "../src/services/BackendClient";
 
-function result(outcome: string, executionAction = ""): DemoEvaluationResult {
+let sequence = 0;
+
+function result(outcome: string): DemoEvaluationResult {
+  sequence += 1;
   return {
-    scenario_id: outcome + executionAction,
+    scenario_id: `scenario-${sequence}`,
     label: "test",
     lane: "APPROVE",
     outcome,
-    execution_action: executionAction,
     mode: "ENFORCEMENT",
     policy_version: "docker-desktop-starter-v1",
-    evaluation_id: "evaluation",
-    dossier_id: "dossier",
-    would_execute: false,
+    evaluation_id: `evaluation-${sequence}`,
+    dossier_id: `dossier-${sequence}`,
     confidence: 1,
   };
 }
 
 describe("summarizeDemoResults", () => {
-  it("counts only exact returned outcomes and block actions", () => {
-    expect(
-      summarizeDemoResults([
-        result("APPROVE"),
-        result("APPROVE"),
-        result("APPROVE"),
-        result("REJECT", "BLOCK"),
-        result("REJECT", "BLOCK"),
-        result("REJECT", "BLOCK"),
-        result("ESCALATE"),
-        result("ESCALATE"),
-        result("ESCALATE"),
-        result("ESCALATE"),
-      ]),
-    ).toEqual({ approve: 3, block: 3, escalate: 4 });
+  it("counts each returned outcome in exactly one published-vocabulary bucket", () => {
+    const results = [
+      result("APPROVE"),
+      result("APPROVE"),
+      result("APPROVE"),
+      result("REJECT"),
+      result("REJECT"),
+      result("REJECT"),
+      result("ESCALATE"),
+      result("ESCALATE"),
+      result("ESCALATE"),
+      result("REVIEW"),
+    ];
+    const counts = summarizeDemoResults(results);
+
+    expect(counts).toEqual({ approve: 3, reject: 3, escalate: 3, review: 1 });
+    expect(counts.approve + counts.reject + counts.escalate + counts.review).toBe(results.length);
   });
 
   it("does not treat an intended lane as a completed result", () => {
-    expect(summarizeDemoResults([])).toEqual({ approve: 0, block: 0, escalate: 0 });
+    expect(summarizeDemoResults([])).toEqual({ approve: 0, reject: 0, escalate: 0, review: 0 });
+  });
+
+  it("leaves an unknown outcome from a newer plane uncounted rather than guessed", () => {
+    expect(summarizeDemoResults([result("DEFER")])).toEqual({
+      approve: 0,
+      reject: 0,
+      escalate: 0,
+      review: 0,
+    });
   });
 });

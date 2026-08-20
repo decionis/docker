@@ -105,10 +105,7 @@ export function App() {
     }
     backend
       .workspace()
-      .then((next) => {
-        setWorkspace(next);
-        setMode(next.enforcement_enabled ? "ENFORCEMENT" : "SHADOW");
-      })
+      .then(setWorkspace)
       .catch(() => setWorkspace(null)); // an older plane simply has nothing to say
 
     backend
@@ -126,6 +123,16 @@ export function App() {
         );
       });
   }, [status?.connected, backend, decisions]);
+
+  // Follow the workspace's enforcement state into the report-mode selector
+  // only when that state actually flips (or first loads). Keying on the
+  // boolean — not the workspace object — keeps the 10-second poll from
+  // stamping over a mode the user picked by hand.
+  const enforcementEnabled = workspace?.enforcement_enabled;
+  useEffect(() => {
+    if (enforcementEnabled === undefined) return;
+    setMode(enforcementEnabled ? "ENFORCEMENT" : "SHADOW");
+  }, [enforcementEnabled]);
 
   useEffect(() => {
     if (!status?.connected) {
@@ -167,14 +174,7 @@ export function App() {
         {feedError && <Alert severity="error">{feedError}</Alert>}
 
         {status?.connected && workspace && (
-          <EnforcementControl
-            backend={backend}
-            workspace={workspace}
-            onChanged={(next) => {
-              setWorkspace(next);
-              setMode(next.enforcement_enabled ? "ENFORCEMENT" : "SHADOW");
-            }}
-          />
+          <EnforcementControl backend={backend} workspace={workspace} onChanged={setWorkspace} />
         )}
 
         {status?.connected && workspace && (

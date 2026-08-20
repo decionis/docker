@@ -74,8 +74,14 @@ function DecisionDetails(props: {
 }) {
   const report = props.report;
   return (
-    <Dialog open={report !== null} onClose={props.onClose} fullWidth maxWidth="md">
-      <DialogTitle>Decision details</DialogTitle>
+    <Dialog
+      open={report !== null}
+      onClose={props.onClose}
+      fullWidth
+      maxWidth="md"
+      aria-labelledby="decision-details-title"
+    >
+      <DialogTitle id="decision-details-title">Decision details</DialogTitle>
       {report && (
         <>
           <DialogContent dividers>

@@ -62,7 +62,7 @@ responsible for execution.
   published JWKS locally; it also reports whether the dossier carries
   everything needed to independently reproduce the decision. The complete
   dossier, verification result, and reproducibility assessment can be copied
-  or downloaded as JSON locally in the browser.
+  or downloaded locally as JSON.
 - **Credential custody done right** — the org API key is held by the
   extension's backend only, never the UI, and the extension mounts no Docker
   Engine socket, no host paths, and ships no host binaries.

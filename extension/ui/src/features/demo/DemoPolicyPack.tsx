@@ -8,23 +8,29 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { useEffect, useMemo, useState } from "react";
 
+import { presentOutcome } from "../../protocol/VerdictLabels";
 import {
   BackendClient,
   BackendError,
   type DemoEvaluationResult,
   type DemoScenario,
 } from "../../services/BackendClient";
-import { summarizeDemoResults } from "./DemoPolicyResults";
+import { summarizeDemoResults, type DemoCounts } from "./DemoPolicyResults";
 
-const LANES: Array<{ key: DemoScenario["lane"]; label: string; color: "success" | "error" | "warning" }> = [
-  { key: "APPROVE", label: "Benign reads", color: "success" },
-  { key: "BLOCK", label: "Destructive actions", color: "error" },
-  { key: "ESCALATE", label: "High-value changes", color: "warning" },
+const LANES: Array<{ key: DemoScenario["lane"]; label: string }> = [
+  { key: "APPROVE", label: "Benign reads" },
+  { key: "REJECT", label: "Destructive actions" },
+  { key: "ESCALATE", label: "High-value changes" },
 ];
 
-function resultLabel(result: DemoEvaluationResult): string {
-  if (result.outcome === "REJECT" && result.execution_action === "BLOCK") return "REJECT · BLOCK";
-  return result.outcome;
+/** Summary chips per published outcome; REVIEW appears only once it happens. */
+function outcomeChipEntries(counts: DemoCounts): Array<{ outcome: string; count: number }> {
+  return [
+    { outcome: "APPROVE", count: counts.approve },
+    { outcome: "REJECT", count: counts.reject },
+    { outcome: "ESCALATE", count: counts.escalate },
+    { outcome: "REVIEW", count: counts.review },
+  ].filter((entry) => entry.outcome !== "REVIEW" || entry.count > 0);
 }
 
 /**
@@ -81,7 +87,9 @@ export function DemoPolicyPack(props: {
           <Box>
             <Stack direction="row" spacing={1} alignItems="center">
               <Typography variant="subtitle1">Docker policy pack</Typography>
-              <Chip size="small" variant="outlined" label="10 live checks" />
+              {scenarios.length > 0 && (
+                <Chip size="small" variant="outlined" label={`${scenarios.length} live checks`} />
+              )}
             </Stack>
             <Typography variant="caption" color="text.secondary">
               Evaluates fixed action proposals in this workspace. No command, deployment, database,
@@ -95,18 +103,28 @@ export function DemoPolicyPack(props: {
           >
             {running
               ? `Evaluating ${results.length + 1} of ${scenarios.length}`
-              : props.enforcementEnabled
-                ? "Run 10 policy checks"
-                : "Enable enforcement to run"}
+              : !props.enforcementEnabled
+                ? "Enable enforcement to run"
+                : scenarios.length > 0
+                  ? `Run ${scenarios.length} policy checks`
+                  : "Policy checks unavailable"}
           </Button>
         </Stack>
 
         {running && <LinearProgress variant="determinate" value={(results.length / scenarios.length) * 100} />}
 
         <Stack direction="row" spacing={1}>
-          <Chip size="small" color="success" label={`APPROVE ${counts.approve}`} />
-          <Chip size="small" color="error" label={`BLOCK ${counts.block}`} />
-          <Chip size="small" color="warning" label={`ESCALATE ${counts.escalate}`} />
+          {outcomeChipEntries(counts).map((entry) => {
+            const presentation = presentOutcome(entry.outcome);
+            return (
+              <Chip
+                key={entry.outcome}
+                size="small"
+                color={presentation.tone}
+                label={`${presentation.label} ${entry.count}`}
+              />
+            );
+          })}
           {results.length > 0 && (
             <Typography variant="caption" color="text.secondary" sx={{ alignSelf: "center" }}>
               {results.length}/{scenarios.length} evaluated by the control plane
@@ -138,9 +156,9 @@ export function DemoPolicyPack(props: {
                         </Typography>
                         <Chip
                           size="small"
-                          color={result ? lane.color : "default"}
+                          color={result ? presentOutcome(result.outcome).tone : "default"}
                           variant={result ? "filled" : "outlined"}
-                          label={result ? resultLabel(result) : "READY"}
+                          label={result ? presentOutcome(result.outcome).label : "READY"}
                         />
                       </Stack>
                     );
@@ -152,8 +170,11 @@ export function DemoPolicyPack(props: {
 
         {results.length === scenarios.length && results.length > 0 && (
           <Alert severity="success">
-            Live policy results: {counts.approve} approved, {counts.block} blocked, {counts.escalate}{" "}
-            escalated. Decision reports and review queue refreshed below.
+            Live policy results:{" "}
+            {outcomeChipEntries(counts)
+              .map((entry) => `${entry.count} ${presentOutcome(entry.outcome).label}`)
+              .join(", ")}
+            . Decision reports and review queue refreshed below.
           </Alert>
         )}
         {error && <Alert severity="error">Policy checks stopped. {error}</Alert>}

@@ -137,7 +137,8 @@ export interface DemoScenario {
   id: string;
   label: string;
   description: string;
-  lane: "APPROVE" | "BLOCK" | "ESCALATE";
+  /** The daemon's expected grouping, named in the protocol's own outcome vocabulary. */
+  lane: "APPROVE" | "REJECT" | "ESCALATE";
 }
 
 export interface DemoScenariosPayload {
@@ -151,12 +152,10 @@ export interface DemoEvaluationResult {
   label: string;
   lane: DemoScenario["lane"];
   outcome: string;
-  execution_action: string;
   mode: string;
   policy_version: string;
   evaluation_id: string;
   dossier_id: string;
-  would_execute: boolean;
   confidence: number;
 }
 

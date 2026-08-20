@@ -79,9 +79,10 @@ These rules apply to the `decionis/docker` monorepo. They are release requiremen
 
 ## 9. Current Validation Entry Points
 
-No component code has landed yet, so no suites exist to enumerate — listing them now would violate verify-then-claim. This section MUST be updated by the same PR that lands each component, with the planned homes:
+These suites exist and gate release (updated 2026-08-20; keep this list current in the same PR that moves or adds a suite):
 
-- `mcp-server/test/` — image posture (non-root, read-only, no-network default), MCP handshake, tool-inventory drift gate (Rules 6.x, 7.4).
-- `internal/**/*_test.go` — daemon/proxy fail-closed, redaction, bounded-input, and load-shedding suites (Rules 3.x, 7.1–7.3).
-- `extension/test/` — extension-socket schema validation, UI-credential exclusion, verdict-label drift gate (Rules 2.3, 4.4; discovery rule 2.6).
-- `features/govern/test/` — feature install/wiring validation, default-off behavior of any opt-in (Rule 6.2).
+- `mcp-server/test/` — image posture (non-root, read-only, no-network default), MCP handshake, tool-inventory drift gate (Rules 6.x, 7.4); run via `mcp-server/test/smoke.sh`.
+- `internal/**/*_test.go` — daemon/proxy/CLI fail-closed, redaction, bounded-input, verification-parity, and demo-proposal suites (Rules 3.x, 7.1–7.3); run via `go test ./...`.
+- `extension/ui/test/` — verdict-label drift gate against the protocol enums, credential-destination naming, decision filters, dossier export, approvals navigation, update banner (Rules 2.3, 4.4; discovery rule 2.6); run via `npm test` in `extension/ui`.
+- `test/automation/` — repo automation helpers (bounded JSON responses, PR opener); run via `node --test test/automation/*.test.mjs`.
+- Dev Container Feature validation runs in `feature-publish.yml` (devcontainers CLI against `features/govern`); the feature has no separate local suite (Rule 6.2 applies to any future opt-in it grows).

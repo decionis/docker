@@ -24,7 +24,7 @@ func TestDockerDemoScenariosCoverTenFixedPolicyChecks(t *testing.T) {
 			t.Fatalf("scenario %q must be attributable to the Docker demo", scenario.ID)
 		}
 	}
-	if lanes["APPROVE"] != 3 || lanes["BLOCK"] != 3 || lanes["ESCALATE"] != 4 {
+	if lanes["APPROVE"] != 3 || lanes["REJECT"] != 3 || lanes["ESCALATE"] != 4 {
 		t.Fatalf("unexpected lane distribution: %#v", lanes)
 	}
 	rm, ok := findDemoScenario("rm-rf")
@@ -40,7 +40,7 @@ func TestDemoEvaluateReturnsExactVerdictAndInvalidatesReportsCache(t *testing.T)
 		evaluateDecision: func(_ context.Context, action api.ActionDescriptor) (*api.Verdict, error) {
 			evaluated = action
 			return &api.Verdict{
-				Outcome: "REJECT", ExecutionAction: "BLOCK", Mode: "ENFORCEMENT",
+				Outcome: "REJECT", Mode: "ENFORCEMENT",
 				PolicyVersion: "docker-desktop-starter-v1", EvaluationID: "evaluation-1",
 				DossierID: "dossier-1", Confidence: 1,
 			}, nil
@@ -58,8 +58,15 @@ func TestDemoEvaluateReturnsExactVerdictAndInvalidatesReportsCache(t *testing.T)
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("demo evaluation failed: %d (%v)", response.StatusCode, body)
 	}
-	if body["outcome"] != "REJECT" || body["execution_action"] != "BLOCK" || body["policy_version"] != "docker-desktop-starter-v1" {
+	if body["outcome"] != "REJECT" || body["mode"] != "ENFORCEMENT" || body["policy_version"] != "docker-desktop-starter-v1" {
 		t.Fatalf("response must preserve the control-plane verdict: %#v", body)
+	}
+	// The evaluate-decision contract has no execution_action or would_execute;
+	// repeating them here would fabricate fields the plane never sent.
+	for _, phantom := range []string{"execution_action", "would_execute"} {
+		if _, present := body[phantom]; present {
+			t.Fatalf("response must not invent %q: %#v", phantom, body)
+		}
 	}
 	if evaluated.DecisionType != "filesystem.delete_recursive" || evaluated.Context["command"] != "rm -rf /workspace/cache" {
 		t.Fatalf("wrong action descriptor: %#v", evaluated)

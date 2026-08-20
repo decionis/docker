@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"time"
 
 	"github.com/decionis/docker/internal/api"
 )
@@ -37,18 +36,19 @@ type demoEvaluateRequest struct {
 	ScenarioID string `json:"scenario_id"`
 }
 
+// demoEvaluateResponse repeats only fields the evaluate-decision contract
+// actually returns; the outcome vocabulary is the protocol's own
+// (APPROVE / REJECT / REVIEW / ESCALATE), rendered verbatim.
 type demoEvaluateResponse struct {
-	ScenarioID      string  `json:"scenario_id"`
-	Label           string  `json:"label"`
-	Lane            string  `json:"lane"`
-	Outcome         string  `json:"outcome"`
-	ExecutionAction string  `json:"execution_action"`
-	Mode            string  `json:"mode"`
-	PolicyVersion   string  `json:"policy_version"`
-	EvaluationID    string  `json:"evaluation_id"`
-	DossierID       string  `json:"dossier_id"`
-	WouldExecute    bool    `json:"would_execute"`
-	Confidence      float64 `json:"confidence"`
+	ScenarioID    string  `json:"scenario_id"`
+	Label         string  `json:"label"`
+	Lane          string  `json:"lane"`
+	Outcome       string  `json:"outcome"`
+	Mode          string  `json:"mode"`
+	PolicyVersion string  `json:"policy_version"`
+	EvaluationID  string  `json:"evaluation_id"`
+	DossierID     string  `json:"dossier_id"`
+	Confidence    float64 `json:"confidence"`
 }
 
 func highRiskScore() *float64 {
@@ -77,17 +77,17 @@ var dockerDemoScenarios = []demoScenario{
 		Action:      api.ActionDescriptor{DecisionType: "logs.read", Channel: "docker_desktop_demo", Context: map[string]any{"service": "checkout", "read_only": true}},
 	},
 	{
-		ID: "rm-rf", Label: "Recursive delete", Lane: "BLOCK",
+		ID: "rm-rf", Label: "Recursive delete", Lane: "REJECT",
 		Description: "Request rm -rf /workspace/cache.",
 		Action:      api.ActionDescriptor{DecisionType: "filesystem.delete_recursive", Channel: "docker_desktop_demo", Context: map[string]any{"command": "rm -rf /workspace/cache", "path": "/workspace/cache"}},
 	},
 	{
-		ID: "database-drop", Label: "Drop production database", Lane: "BLOCK",
+		ID: "database-drop", Label: "Drop production database", Lane: "REJECT",
 		Description: "Request deletion of analytics_prod.",
 		Action:      api.ActionDescriptor{DecisionType: "database.drop", Channel: "docker_desktop_demo", Context: map[string]any{"database": "analytics_prod", "environment": "production"}},
 	},
 	{
-		ID: "secrets-export", Label: "Export production secrets", Lane: "BLOCK",
+		ID: "secrets-export", Label: "Export production secrets", Lane: "REJECT",
 		Description: "Request a production secret export.",
 		Action:      api.ActionDescriptor{DecisionType: "secrets.export", Channel: "docker_desktop_demo", Context: map[string]any{"secret_scope": "production", "destination": "local-file"}},
 	},
@@ -181,16 +181,15 @@ func (d *Daemon) handleDemoEvaluate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// The decision report just changed; never serve the pre-evaluation cache.
+	// Only the cache is touched: lastSync records report syncs, and this
+	// handler did not perform one.
 	d.mu.Lock()
 	d.cache = nil
-	d.lastSync = time.Now()
-	d.lastError = ""
 	d.mu.Unlock()
 	writeJSON(w, http.StatusOK, demoEvaluateResponse{
 		ScenarioID: scenario.ID, Label: scenario.Label, Lane: scenario.Lane,
-		Outcome: verdict.Outcome, ExecutionAction: verdict.ExecutionAction,
-		Mode: verdict.Mode, PolicyVersion: verdict.PolicyVersion,
-		EvaluationID: verdict.EvaluationID, DossierID: verdict.DossierID,
-		WouldExecute: verdict.WouldExecute, Confidence: verdict.Confidence,
+		Outcome: verdict.Outcome, Mode: verdict.Mode,
+		PolicyVersion: verdict.PolicyVersion, EvaluationID: verdict.EvaluationID,
+		DossierID: verdict.DossierID, Confidence: verdict.Confidence,
 	})
 }
