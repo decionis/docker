@@ -127,6 +127,33 @@ export interface ApprovalsPayload {
   count: number;
 }
 
+export interface DemoScenario {
+  id: string;
+  label: string;
+  description: string;
+  lane: "APPROVE" | "BLOCK" | "ESCALATE";
+}
+
+export interface DemoScenariosPayload {
+  scenarios: DemoScenario[];
+  count: number;
+  notice: string;
+}
+
+export interface DemoEvaluationResult {
+  scenario_id: string;
+  label: string;
+  lane: DemoScenario["lane"];
+  outcome: string;
+  execution_action: string;
+  mode: string;
+  policy_version: string;
+  evaluation_id: string;
+  dossier_id: string;
+  would_execute: boolean;
+  confidence: number;
+}
+
 export interface ClaimStart {
   claim_url: string;
   expires_in: number;
@@ -270,6 +297,18 @@ export class BackendClient {
   /** Entries awaiting a person's review. */
   approvals(): Promise<ApprovalsPayload> {
     return this.transport.request("GET", "/api/approvals") as Promise<ApprovalsPayload>;
+  }
+
+  /** The daemon's fixed, non-executing policy-check proposals. */
+  demoScenarios(): Promise<DemoScenariosPayload> {
+    return this.transport.request("GET", "/api/demo/scenarios") as Promise<DemoScenariosPayload>;
+  }
+
+  /** Evaluates one fixed proposal against the connected workspace. */
+  evaluateDemoScenario(scenarioId: string): Promise<DemoEvaluationResult> {
+    return this.transport.request("POST", "/api/demo/evaluate", {
+      scenario_id: scenarioId,
+    }) as Promise<DemoEvaluationResult>;
   }
 
   /** Mints a claim URL for this workspace; the browser finishes the claim. */
