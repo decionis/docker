@@ -1,0 +1,35 @@
+name: Documentation improvement
+description: Report missing, unclear, stale, or incorrect documentation.
+title: "[Docs]: "
+labels: [documentation]
+body:
+  - type: input
+    id: location
+    attributes:
+      label: Documentation location
+      description: Link to the page or provide the repository path.
+    validations:
+      required: true
+  - type: textarea
+    id: gap
+    attributes:
+      label: What is unclear or missing?
+    validations:
+      required: true
+  - type: textarea
+    id: audience
+    attributes:
+      label: Intended audience and task
+      description: Who is reading this, and what should they be able to complete?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      value: |
+        - [ ] The documented steps can be followed from a clean environment.
+        - [ ] Commands, links, tags, and filenames match the repository.
+        - [ ] Security-sensitive guidance follows SECURITY.md.
+    validations:
+      required: true

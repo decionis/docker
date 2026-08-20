@@ -9,7 +9,7 @@ custody, orderings, and every user-owned manual step live here.
   custody here_.
 - CI credentials: repository secrets `DOCKERHUB_USERNAME` and
   `DOCKERHUB_TOKEN` (a scoped access token with read/write on `decionis/mcp`
-  only — never an account password). Until these exist, `mcp-publish.yml`
+  only — never an account password). Until these exist, `actions.yml`
   verifies the release and skips pushing (silent no-op, Rule 3.2).
 
 ## Preconditions for the FIRST publish (Rule 1.1 gate)
@@ -41,7 +41,7 @@ custody, orderings, and every user-owned manual step live here.
    if upstream added or renamed tools, update `SmokeClient.mjs`'s
    `EXPECTED_TOOLS`, the overview's Tools table, and the catalog entry in the
    same PR.
-2. Merge, then push tag `mcp-vX.Y.Z`. `.github/workflows/mcp-publish.yml`
+2. Merge, then push tag `mcp-vX.Y.Z`. `.github/workflows/actions.yml`
    re-verifies (hadolint ran on PR; smoke + trivy run again), then — with
    credentials present — pushes linux/amd64 + linux/arm64 with provenance
    and SBOM attestations and signs the digest with keyless cosign.

@@ -4,7 +4,7 @@ Owner-facing runbook per `rules/discovery.rules.md` Rule 4.5.
 
 ## Ordering (Rule 4.1 analog)
 
-1. **CLI release first**: push tag `cli-vX.Y.Z` → `cli-publish.yml` creates
+1. **CLI release first**: push tag `cli-vX.Y.Z` → `actions.yml` creates
    the GitHub release with binaries + `SHA256SUMS`. The feature's
    `install.sh` downloads exactly those assets and refuses to install on a
    checksum mismatch.
@@ -40,4 +40,4 @@ docker run --rm -v /tmp/decionis_local.tar.gz:/tmp/cli.tar.gz:ro \
 | Date | Version | Where | Notes |
 | ---- | ------- | ----- | ----- |
 | 2026-08-18 | CLI `cli-v0.1.0` (prerequisite, ordering step 1) | GitHub release | linux/darwin × amd64/arm64 + `SHA256SUMS`; `decionis_darwin_arm64` checksum-verified and executed locally (`decionis version` → 0.1.0). |
-| 2026-08-18 | Feature `feature-govern-v0.1.0` | `ghcr.io/decionis/features/govern` via `feature-publish.yml` (green) | **Package starts private** — owner must make it public once in the ghcr package settings before anyone can install; containers.dev index submission after that (step 4). |
+| 2026-08-18 | Feature `feature-govern-v0.1.0` | `ghcr.io/decionis/features/govern` via `actions.yml` (green) | **Package starts private** — owner must make it public once in the ghcr package settings before anyone can install; containers.dev index submission after that (step 4). |

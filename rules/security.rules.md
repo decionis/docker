@@ -85,4 +85,4 @@ These suites exist and gate release (updated 2026-08-20; keep this list current 
 - `internal/**/*_test.go` — daemon/proxy/CLI fail-closed, redaction, bounded-input, verification-parity, and demo-proposal suites (Rules 3.x, 7.1–7.3); run via `go test ./...`.
 - `extension/ui/test/` — verdict-label drift gate against the protocol enums, credential-destination naming, decision filters, dossier export, approvals navigation, update banner (Rules 2.3, 4.4; discovery rule 2.6); run via `npm test` in `extension/ui`.
 - `test/automation/` — repo automation helpers (bounded JSON responses, PR opener); run via `node --test test/automation/*.test.mjs`.
-- Dev Container Feature validation runs in `feature-publish.yml` (devcontainers CLI against `features/govern`); the feature has no separate local suite (Rule 6.2 applies to any future opt-in it grows).
+- Dev Container Feature validation runs in `actions.yml` (devcontainers CLI against `features/govern`); the feature has no separate local suite (Rule 6.2 applies to any future opt-in it grows).

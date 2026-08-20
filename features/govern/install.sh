@@ -1,6 +1,6 @@
 #!/bin/sh
 # Dev Container Feature install script: installs the decionis CLI from this
-# repo's GitHub releases (asset naming per .github/workflows/cli-publish.yml),
+# repo's GitHub releases (asset naming per .github/workflows/actions.yml),
 # with mandatory checksum verification. DECIONIS_CLI_TARBALL overrides the
 # download with a local tarball (tests, air-gapped installs).
 set -eu

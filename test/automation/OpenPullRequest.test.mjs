@@ -64,7 +64,7 @@ describe("PullRequestBot", () => {
           head_branch: "feature/owned",
           actor: { login: expectedAuthorLogin },
           repository: { full_name: repository },
-          path: ".github/workflows/PrBot.yml",
+          path: ".github/workflows/actions.yml",
         };
       }
       if (path.endsWith("/pulls") && method === "POST") {
