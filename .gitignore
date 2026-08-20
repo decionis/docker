@@ -30,3 +30,4 @@ extension/ui/dist/
 
 # Scratch
 tmp/
+outputs/
