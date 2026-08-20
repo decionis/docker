@@ -9,9 +9,13 @@
     - https://github.com/decionis/docker -> HTTP 200
     - https://hub.docker.com/r/decionis/mcp -> verified via Hub API
       (v2/repositories 200)
+  Link sweep 2026-08-20:
+    - screenshot raw URL below (SHA-pinned, commit dce49dd6) -> HTTP 200
 -->
 
 # Decionis — execution authority for AI agents, inside Docker Desktop
+
+![The Decionis console after ten live policy checks: three proposals APPROVED, three REJECTED, four ESCALATED to a person, with the review queue and governed-decision counters](https://raw.githubusercontent.com/decionis/docker/dce49dd6e12afa9e068e4709812f70466113c41c/docs/screenshots/desktop-extension-0.1.8-policy-pack.png)
 
 Decionis adds an execution-authority layer to Docker-based AI and automation
 workflows.
