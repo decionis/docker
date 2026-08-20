@@ -31,7 +31,7 @@ checks remain **publish-gated** and fail on any local single-arch build:
       `docs/screenshots/` and reference their `raw.githubusercontent.com`
       URLs once the repo is public; the validator live-checks them
       (Rule 1.1 enforced by Docker's own tooling).
-- [x] Multi-platform image — `extension-publish.yml` pushed
+- [x] Multi-platform image — `actions.yml` pushed
       `linux/amd64,linux/arm64` on 2026-08-18; `docker extension validate`
       against the published `0.1.0` now passes the multiplatform check.
       Screenshots are the single remaining validate item.

@@ -9,7 +9,7 @@ const maxTimeoutMs = 15_000;
 const maxAttemptsLimit = 3;
 const maxPages = 3;
 const perPage = 100;
-const branchCreationWorkflow = ".github/workflows/PrBot.yml";
+const branchCreationWorkflow = ".github/workflows/actions.yml";
 const prBodySectionLimit = 8 * 1024;
 const commitHeadlineLimit = 160;
 

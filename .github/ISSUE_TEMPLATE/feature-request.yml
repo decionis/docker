@@ -1,0 +1,50 @@
+name: Feature request
+description: Propose an improvement to a Docker integration surface without moving policy decisions into this repository.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Describe the user or operator problem, independent of a preferred implementation.
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Docker Desktop extension
+        - MCP image
+        - Authority image
+        - CLI
+        - Dev Container Feature
+        - GitHub Actions / release automation
+        - Cross-component
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed outcome
+      description: Explain the desired experience and the protocol boundary it relies on.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List observable, testable completion conditions.
+      value: |
+        - [ ] The new behavior is covered by automated tests.
+        - [ ] Failure paths remain fail closed.
+        - [ ] User-facing behavior and release notes are documented.
+        - [ ] No policy thresholds, authority minting, or signing secrets are added to this repository.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What workarounds or alternative designs have you considered?

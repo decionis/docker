@@ -10,7 +10,7 @@ it. Owner-facing per `rules/discovery.rules.md` Rule 4.5.
 git tag authority-v0.1.0 && git push origin authority-v0.1.0
 ```
 
-`.github/workflows/authority-publish.yml` then builds, **smoke-tests**,
+`.github/workflows/actions.yml` then builds, **smoke-tests**,
 scans, and — with Docker Hub credentials present — pushes
 `decionis/authority:X.Y.Z` and `:latest` multi-arch with provenance + SBOM
 attestations and a keyless cosign signature. Without credentials the

@@ -1,0 +1,67 @@
+name: Bug report
+description: Report a reproducible problem in the CLI, MCP image, authority image, Dev Container Feature, or Docker Desktop extension.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Decionis for Docker. Do not include credentials, private policies, or unredacted Decision Dossiers.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Docker Desktop extension
+        - MCP image
+        - Authority image
+        - CLI
+        - Dev Container Feature
+        - GitHub Actions / release automation
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Problem
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Provide the smallest safe sequence that reproduces the problem.
+      placeholder: |
+        1. Run ...
+        2. Configure ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include relevant versions, operating system, architecture, Docker version, and image digest or tag.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Describe the observable conditions that would prove this bug is fixed.
+      value: |
+        - [ ] The reported reproduction no longer fails.
+        - [ ] A regression test covers the failure mode.
+        - [ ] Fail-closed and credential-handling guarantees remain intact.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: I removed secrets, private policy content, customer payloads, and unredacted dossier data.
+          required: true

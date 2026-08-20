@@ -1,11 +1,11 @@
 # Decionis for Docker
 
 <!-- Badge sweep 2026-08-18: every URL below verified HTTP 200 (rules/discovery.rules.md Rule 1.1),
-     with two branch-lifecycle caveats that resolve at merge: the decionis.yml badge endpoint
+     with two branch-lifecycle caveats that resolve at merge: the actions.yml badge endpoint
      registers when the workflow reaches the default branch (this README publishes in the same
      merge), and coverage populates on the first master CI run after the codecov upload landed. -->
 
-[![CI](https://github.com/decionis/docker/actions/workflows/decionis.yml/badge.svg)](https://github.com/decionis/docker/actions/workflows/decionis.yml)
+[![CI](https://github.com/decionis/docker/actions/workflows/actions.yml/badge.svg)](https://github.com/decionis/docker/actions/workflows/actions.yml)
 [![License](https://img.shields.io/github/license/decionis/docker)](https://github.com/decionis/docker/blob/master/LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/decionis/docker)](https://goreportcard.com/report/github.com/decionis/docker)
 [![Coverage](https://codecov.io/gh/decionis/docker/graph/badge.svg)](https://codecov.io/gh/decionis/docker)
