@@ -34,6 +34,8 @@ export interface DecisionReport {
   would_execute: boolean;
   execution_action: string;
   reason: string;
+  policy_guard_reason?: string | null;
+  policy_evaluation_resolution?: string | null;
   selected_rule_id?: string | null;
   dossier_api_path: string;
 }
@@ -46,6 +48,10 @@ export interface DecisionSummary {
   review_required_count: number;
   non_approve_count: number;
   non_approve_rate: number;
+  policy_mismatch_count?: number | null;
+  policy_mismatch_rate?: number | null;
+  near_miss_count?: number | null;
+  near_miss_rate?: number | null;
   outcome_counts?: Record<string, number>;
 }
 
