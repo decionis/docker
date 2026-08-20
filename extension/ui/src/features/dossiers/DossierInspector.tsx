@@ -1,5 +1,6 @@
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Divider from "@mui/material/Divider";
@@ -12,6 +13,11 @@ import Typography from "@mui/material/Typography";
 import { useEffect, useState } from "react";
 
 import { BackendClient, BackendError, type DossierPayload } from "../../services/BackendClient";
+import {
+  copyDossierExport,
+  downloadDossierExport,
+  type DossierExportFeedback,
+} from "./DossierExport";
 
 function checkColor(severity: "pass" | "warn" | "fail"): "success" | "warning" | "error" {
   if (severity === "pass") return "success";
@@ -32,16 +38,20 @@ export function DossierInspector(props: {
   const [payload, setPayload] = useState<DossierPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [exportFeedback, setExportFeedback] = useState<DossierExportFeedback | null>(null);
 
   useEffect(() => {
     if (!props.dossierId) {
       setPayload(null);
       setError(null);
+      setExportFeedback(null);
       return;
     }
     let cancelled = false;
+    setPayload(null);
     setLoading(true);
     setError(null);
+    setExportFeedback(null);
     props.backend
       .dossier(props.dossierId)
       .then((next) => {
@@ -63,6 +73,34 @@ export function DossierInspector(props: {
 
   const verification = payload?.verification;
 
+  async function handleCopy() {
+    if (!payload) return;
+    const feedback = await copyDossierExport(payload, async (json) => {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+      await navigator.clipboard.writeText(json);
+    });
+    setExportFeedback(feedback);
+  }
+
+  function handleDownload() {
+    if (!payload) return;
+    const feedback = downloadDossierExport(payload, (exported) => {
+      const url = URL.createObjectURL(new Blob([exported.json], { type: "application/json" }));
+      const anchor = document.createElement("a");
+      try {
+        anchor.href = url;
+        anchor.download = exported.filename;
+        anchor.style.display = "none";
+        document.body.appendChild(anchor);
+        anchor.click();
+      } finally {
+        anchor.remove();
+        URL.revokeObjectURL(url);
+      }
+    });
+    setExportFeedback(feedback);
+  }
+
   return (
     <Drawer anchor="right" open={props.dossierId !== null} onClose={props.onClose}>
       <Box sx={{ width: 520, maxWidth: "90vw", p: 3 }}>
@@ -75,6 +113,21 @@ export function DossierInspector(props: {
 
         {loading && <CircularProgress size={24} />}
         {error && <Alert severity="error">{error}</Alert>}
+        {payload && (
+          <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+            <Button size="small" variant="outlined" onClick={() => void handleCopy()}>
+              Copy JSON
+            </Button>
+            <Button size="small" variant="outlined" onClick={handleDownload}>
+              Download JSON
+            </Button>
+          </Stack>
+        )}
+        {exportFeedback && (
+          <Alert severity={exportFeedback.severity} aria-live="polite" sx={{ mb: 2 }}>
+            {exportFeedback.message}
+          </Alert>
+        )}
 
         {verification && (
           <Stack spacing={2}>

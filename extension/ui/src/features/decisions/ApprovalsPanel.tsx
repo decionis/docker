@@ -1,11 +1,19 @@
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 
 import type { PendingApproval } from "../../services/BackendClient";
+
+export function inspectApprovalDossier(
+  approval: PendingApproval,
+  onInspect: (dossierId: string) => void,
+): void {
+  if (approval.dossier_id) onInspect(approval.dossier_id);
+}
 
 /**
  * What is waiting on a person.
@@ -18,6 +26,7 @@ import type { PendingApproval } from "../../services/BackendClient";
 export function ApprovalsPanel(props: {
   approvals: PendingApproval[] | null;
   error: string | null;
+  onInspect: (dossierId: string) => void;
 }) {
   if (props.error) {
     return (
@@ -59,6 +68,12 @@ export function ApprovalsPanel(props: {
               <Typography variant="body2">{approval.decision_type || "—"}</Typography>
               {approval.override_status && (
                 <Chip size="small" variant="outlined" label={`override ${approval.override_status}`} />
+              )}
+              <Box sx={{ flex: 1 }} />
+              {approval.dossier_id && (
+                <Button size="small" onClick={() => inspectApprovalDossier(approval, props.onInspect)}>
+                  Inspect dossier
+                </Button>
               )}
             </Stack>
             <Typography variant="caption" color="text.secondary">

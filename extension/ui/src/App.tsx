@@ -198,7 +198,11 @@ export function App() {
         )}
 
         {status?.connected && (approvals !== null || approvalsError) && (
-          <ApprovalsPanel approvals={approvals} error={approvalsError} />
+          <ApprovalsPanel
+            approvals={approvals}
+            error={approvalsError}
+            onInspect={setInspectedDossierId}
+          />
         )}
 
         {status?.connected && decisions && <SummaryStrip summary={decisions.response.summary} />}

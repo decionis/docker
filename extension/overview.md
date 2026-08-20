@@ -49,13 +49,20 @@ responsible for execution.
 
 ## What the extension shows
 
-- **Live decision evaluations** — outcomes `APPROVE / ESCALATE / REJECT /
-  REVIEW` with the policy version, execution action, and reason behind each
-  one, plus summary counts.
+- **Investigable decision evaluations** — search by type, domain, reason,
+  policy, rule, evaluation ID, or dossier ID; combine outcome, execution,
+  policy, and domain/type filters; then open structured decision details.
+  Summary cards include the protocol's policy-mismatch and near-miss counts
+  and rates.
+- **Approval-to-dossier navigation** — decisions awaiting human review link
+  directly to their Decision Dossiers when a dossier ID is available. The
+  approval itself remains in the established Decionis Presence flow.
 - **Signed Decision Dossiers, verified offline** — the extension fetches a
   decision's dossier and verifies its Ed25519 proof bundle against the
   published JWKS locally; it also reports whether the dossier carries
-  everything needed to independently reproduce the decision.
+  everything needed to independently reproduce the decision. The complete
+  dossier, verification result, and reproducibility assessment can be copied
+  or downloaded as JSON locally in the browser.
 - **Credential custody done right** — the org API key is held by the
   extension's backend only, never the UI, and the extension mounts no Docker
   Engine socket, no host paths, and ships no host binaries.
