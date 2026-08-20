@@ -385,16 +385,32 @@ func severityFor(ok bool) string {
 // public endpoint returned, mirroring upstream extractDossierPayload.
 func ExtractDossierPayload(body any) map[string]any {
 	record := asRecord(body)
+	if payload, ok := findDossierPayload(record, 0); ok {
+		return payload
+	}
+	return record
+}
+
+// findDossierPayload follows only the bounded public API envelope keys. The
+// dossier read route returns dossier.dossier_payload, while direct protocol
+// callers can receive dossier_payload (or the payload itself).
+func findDossierPayload(record map[string]any, depth int) (map[string]any, bool) {
 	if _, ok := asRecord(record["integrity"])["proof_bundle"]; ok {
-		return record
+		return record, true
+	}
+	if depth >= 4 {
+		return nil, false
 	}
 	for _, key := range []string{"dossier", "dossier_payload", "data", "result"} {
 		candidate := asRecord(record[key])
-		if _, ok := asRecord(candidate["integrity"])["proof_bundle"]; ok {
-			return candidate
+		if len(candidate) == 0 {
+			continue
+		}
+		if payload, ok := findDossierPayload(candidate, depth+1); ok {
+			return payload, true
 		}
 	}
-	return record
+	return nil, false
 }
 
 // ResolveJwksURL works out where to fetch the public JWKS for a dossier,

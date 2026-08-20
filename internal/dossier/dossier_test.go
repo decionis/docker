@@ -155,6 +155,17 @@ func TestExtractDossierPayloadUnwrapsEnvelopes(t *testing.T) {
 	if _, ok := asRecord(direct["integrity"])["proof_bundle"]; !ok {
 		t.Fatal("raw payload not accepted")
 	}
+
+	nested := ExtractDossierPayload(map[string]any{
+		"service": "decionis-protocol",
+		"dossier": map[string]any{
+			"dossier_id":      "11111111-1111-4111-8111-111111111111",
+			"dossier_payload": payload,
+		},
+	})
+	if _, ok := asRecord(nested["integrity"])["proof_bundle"]; !ok {
+		t.Fatal("nested dossier.dossier_payload envelope not unwrapped")
+	}
 }
 
 func TestResolveJwksURL(t *testing.T) {

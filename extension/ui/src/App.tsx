@@ -10,6 +10,7 @@ import { SummaryStrip } from "./features/decisions/SummaryStrip";
 import { DossierInspector } from "./features/dossiers/DossierInspector";
 import { EnforcementControl } from "./features/connection/EnforcementControl";
 import { ApprovalsPanel } from "./features/decisions/ApprovalsPanel";
+import { DemoPolicyPack } from "./features/demo/DemoPolicyPack";
 import type { ReportMode } from "./protocol/VerdictLabels";
 import {
   BackendClient,
@@ -104,7 +105,10 @@ export function App() {
     }
     backend
       .workspace()
-      .then(setWorkspace)
+      .then((next) => {
+        setWorkspace(next);
+        setMode(next.enforcement_enabled ? "ENFORCEMENT" : "SHADOW");
+      })
       .catch(() => setWorkspace(null)); // an older plane simply has nothing to say
 
     backend
@@ -163,7 +167,34 @@ export function App() {
         {feedError && <Alert severity="error">{feedError}</Alert>}
 
         {status?.connected && workspace && (
-          <EnforcementControl backend={backend} workspace={workspace} onChanged={setWorkspace} />
+          <EnforcementControl
+            backend={backend}
+            workspace={workspace}
+            onChanged={(next) => {
+              setWorkspace(next);
+              setMode(next.enforcement_enabled ? "ENFORCEMENT" : "SHADOW");
+            }}
+          />
+        )}
+
+        {status?.connected && workspace && (
+          <DemoPolicyPack
+            backend={backend}
+            enforcementEnabled={workspace.enforcement_enabled}
+            onCompleted={async () => {
+              setMode("ENFORCEMENT");
+              const [nextWorkspace, nextApprovals, nextDecisions] = await Promise.all([
+                backend.workspace(),
+                backend.approvals(),
+                backend.decisions("ENFORCEMENT", 100),
+              ]);
+              setWorkspace(nextWorkspace);
+              setApprovals(nextApprovals.approvals ?? []);
+              setApprovalsError(null);
+              setDecisions(nextDecisions);
+              setFeedError(null);
+            }}
+          />
         )}
 
         {status?.connected && (approvals !== null || approvalsError) && (

@@ -21,10 +21,11 @@ import (
 const keySentinel = "sk-live-SENTINEL-NEVER-LOGGED"
 
 type fakeHosted struct {
-	listReports func(ctx context.Context, mode string, limit int) (*api.ReportsResponse, error)
-	getDossier  func(ctx context.Context, id string) (map[string]any, string, error)
-	fetchJwks   func(ctx context.Context, url string) (*dossier.Jwks, error)
-	listCalls   int
+	listReports      func(ctx context.Context, mode string, limit int) (*api.ReportsResponse, error)
+	getDossier       func(ctx context.Context, id string) (map[string]any, string, error)
+	fetchJwks        func(ctx context.Context, url string) (*dossier.Jwks, error)
+	evaluateDecision func(ctx context.Context, action api.ActionDescriptor) (*api.Verdict, error)
+	listCalls        int
 }
 
 func (f *fakeHosted) ListReports(ctx context.Context, mode string, limit int) (*api.ReportsResponse, error) {
@@ -38,6 +39,10 @@ func (f *fakeHosted) GetDossier(ctx context.Context, id string) (map[string]any,
 
 func (f *fakeHosted) FetchJwks(ctx context.Context, url string) (*dossier.Jwks, error) {
 	return f.fetchJwks(ctx, url)
+}
+
+func (f *fakeHosted) EvaluateDecision(ctx context.Context, action api.ActionDescriptor) (*api.Verdict, error) {
+	return f.evaluateDecision(ctx, action)
 }
 
 func emptyReports(_ context.Context, mode string, _ int) (*api.ReportsResponse, error) {
