@@ -57,6 +57,11 @@ responsible for execution.
 - **Approval-to-dossier navigation** — decisions awaiting human review link
   directly to their Decision Dossiers when a dossier ID is available. The
   approval itself remains in the established Decionis Presence flow.
+- **A runnable Docker policy pack** — ten fixed action proposals (benign
+  reads, destructive actions, high-value changes) evaluated live by the
+  connected workspace's policy, with the exact returned outcome. The daemon
+  owns every proposal; nothing the proposals describe is ever executed. Runs
+  when enforcement is enabled, and each check uses one governed decision.
 - **Signed Decision Dossiers, verified offline** — the extension fetches a
   decision's dossier and verifies its Ed25519 proof bundle against the
   published JWKS locally; it also reports whether the dossier carries
@@ -77,7 +82,7 @@ install it directly (Docker Desktop → Settings → Extensions → allow
 non-marketplace extensions):
 
 ```bash
-docker extension install decionis/desktop-extension:0.1.7
+docker extension install decionis/desktop-extension:0.1.8
 ```
 
 Then open the **Decionis** tab. That is the whole setup: a workspace is

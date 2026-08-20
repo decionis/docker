@@ -100,6 +100,21 @@ Later releases (same pipeline, same guarantees):
   `/v1/protocol/decisions/awaiting-approval` and
   `/v1/docker-desktop/workspace/claim-token`; both were verified live
   against production with an authenticated probe before this tag was cut.
+- 2026-08-20 `ext-v0.1.8` — the governance investigation console and the
+  Docker policy pack. Client-side search and AND-combined filters (outcome,
+  execution action, policy version, domain/type) over the loaded reports
+  with matching/loaded counts, an accessible decision-details dialog,
+  policy-mismatch and near-miss summary cards, approvals linking straight
+  to their dossier, and local copy/download of the complete dossier JSON.
+  The policy pack sends ten fixed action proposals to the connected
+  workspace and renders the exact returned outcomes; the daemon owns every
+  descriptor and nothing proposed is executed. Requires
+  decionis/Decionis#929 deployed — the starter policy
+  (`docker-desktop-starter-v1`) provisioned at workspace mint is what makes
+  the destructive-action proposals come back REJECT; production ran it from
+  the branch deploy (API SHA `b5a54da`) during the native verification on
+  2026-08-20, and #929 lands the same commits on master so later deploys
+  keep it.
 
 
 ## Before marketplace submission (Rule 1.1 gates)
