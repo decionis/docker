@@ -1,5 +1,6 @@
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -21,6 +22,7 @@ import {
   type PendingApproval,
   type WorkspaceState,
 } from "./services/BackendClient";
+import { interpretAutoConnect, type AutoConnectOutcome } from "./services/AutoConnect";
 import {
   dismissUpdateVersion,
   readDismissedVersion,
@@ -42,6 +44,7 @@ export function App() {
   const [approvals, setApprovals] = useState<PendingApproval[] | null>(null);
   const [approvalsError, setApprovalsError] = useState<string | null>(null);
   const [dismissedUpdate, setDismissedUpdate] = useState<string | null>(() => readDismissedVersion());
+  const [autoConnectOutcome, setAutoConnectOutcome] = useState<AutoConnectOutcome | null>(null);
   const pollRef = useRef<number | null>(null);
   const autoSignupTried = useRef(false);
 
@@ -79,13 +82,20 @@ export function App() {
   // when the daemon reports it has never been connected; a failure is silent
   // here and simply leaves the normal connect options in the disconnected
   // view. The daemon refuses a second mint, so this can never replace a
-  // working connection.
+  // working connection. The daemon also sends its persisted installation id,
+  // so a repeat run reconnects the workspace this install already minted
+  // (worth a quiet notice) — or learns that workspace belongs to an account
+  // now and offers sign-in instead.
   useEffect(() => {
     if (status === null || status.connected || autoSignupTried.current) return;
     autoSignupTried.current = true;
     backend
       .connectAuto()
-      .then(setStatus)
+      .then((next) => {
+        setStatus(next);
+        const outcome = interpretAutoConnect(next);
+        if (outcome.kind !== "fresh") setAutoConnectOutcome(outcome);
+      })
       .catch(() => {
         /* leave the disconnected view and its connect options in place */
       });
@@ -168,6 +178,36 @@ export function App() {
           >
             Version {updateInfo!.latest_version} is available (you have {updateInfo!.current_version}).
             Update with <code>docker extension update decionis/desktop-extension:{updateInfo!.latest_version}</code>.
+          </Alert>
+        )}
+
+        {autoConnectOutcome?.kind === "reconnected" && (
+          <Alert severity="success" onClose={() => setAutoConnectOutcome(null)}>
+            {autoConnectOutcome.notice} Its earlier keys were retired and this extension holds a
+            fresh one.
+          </Alert>
+        )}
+
+        {autoConnectOutcome?.kind === "claimed" && !status?.connected && (
+          <Alert
+            severity="info"
+            action={
+              <Stack direction="row" spacing={1}>
+                <Button size="small" variant="contained" onClick={() => setSettingsOpen(true)}>
+                  Sign in
+                </Button>
+                {autoConnectOutcome.signInUrl && (
+                  <Button
+                    size="small"
+                    onClick={() => backend.openExternal(autoConnectOutcome.signInUrl!)}
+                  >
+                    Open sign-in page
+                  </Button>
+                )}
+              </Stack>
+            }
+          >
+            This workspace belongs to an account — sign in to reconnect it.
           </Alert>
         )}
 

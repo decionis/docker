@@ -64,6 +64,127 @@ func TestAutoConnectMintsAWorkspaceWithNoInput(t *testing.T) {
 	if stub.seenUsername != "" {
 		t.Fatalf("no username should be sent by default, got %q", stub.seenUsername)
 	}
+
+	// A fresh mint keeps today's response shape exactly: no reuse or claim
+	// markers for older UIs to trip on.
+	for _, marker := range []string{"reused", "claimed", "sign_in_url", "org_name"} {
+		if strings.Contains(rec.Body.String(), marker) {
+			t.Fatalf("fresh mint response must not carry %q: %s", marker, rec.Body.String())
+		}
+	}
+
+	// The provision carried a freshly minted installation id, persisted for
+	// every later provision and never surfaced to the UI.
+	if len(stub.seenInstallationIDs) != 1 {
+		t.Fatalf("provision calls saw ids %v, want exactly one", stub.seenInstallationIDs)
+	}
+	sent := stub.seenInstallationIDs[0]
+	if len(sent) < 32 {
+		t.Fatalf("installation id %q is shorter than 32 chars", sent)
+	}
+	if strings.Contains(rec.Body.String(), sent) {
+		t.Fatal("response leaked the installation id")
+	}
+	stored, err := d.store.LoadInstallationID()
+	if err != nil || stored != sent {
+		t.Fatalf("stored installation id = %q (err %v), want the sent id %q", stored, err, sent)
+	}
+}
+
+func TestAutoConnectReusesOneInstallationIDAcrossReconnects(t *testing.T) {
+	d := signupDaemon(t)
+	stub := stubProvision(t, &api.Workspace{
+		OrgID: "11111111-1111-4111-8111-111111111111", RawKey: "dcn_live_first", Provisional: true,
+	}, nil)
+
+	if rec := postJSON(d, "/api/connect/auto", "{}"); rec.Code != http.StatusOK {
+		t.Fatalf("first connect: %d", rec.Code)
+	}
+
+	// Disconnect clears the credentials but must keep the install's identity.
+	deleteRec := httptest.NewRecorder()
+	d.Handler().ServeHTTP(deleteRec, httptest.NewRequest(http.MethodDelete, "/api/connection", nil))
+	if deleteRec.Code != http.StatusNoContent {
+		t.Fatalf("disconnect: %d", deleteRec.Code)
+	}
+
+	// The control plane recognizes the id: same workspace, fresh key.
+	stub.workspace = &api.Workspace{
+		OrgID: "11111111-1111-4111-8111-111111111111", RawKey: "dcn_live_second",
+		OrgName: "My Docker Workspace", Provisional: true, Reused: true,
+	}
+	rec := postJSON(d, "/api/connect/auto", "{}")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("second connect: got %d body %s", rec.Code, rec.Body.String())
+	}
+
+	if len(stub.seenInstallationIDs) != 2 || stub.seenInstallationIDs[0] != stub.seenInstallationIDs[1] {
+		t.Fatalf("both provisions must send the same persisted id, got %v", stub.seenInstallationIDs)
+	}
+	if !strings.Contains(rec.Body.String(), `"reused":true`) {
+		t.Fatalf("reuse must be surfaced to the UI: %s", rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"org_name":"My Docker Workspace"`) {
+		t.Fatalf("reuse must name the workspace for the UI's notice: %s", rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), "dcn_live_second") {
+		t.Fatal("response leaked the fresh key")
+	}
+
+	// Every earlier key was just revoked upstream — only the fresh one may
+	// remain stored.
+	_, apiKey, ok, err := d.store.Load()
+	if err != nil || !ok {
+		t.Fatalf("store load after reuse: ok=%v err=%v", ok, err)
+	}
+	if apiKey != "dcn_live_second" {
+		t.Fatalf("stored key = %q, want the fresh key", apiKey)
+	}
+}
+
+func TestAutoConnectClaimedWorkspaceOffersSignIn(t *testing.T) {
+	d := signupDaemon(t)
+	stubProvision(t, nil, &api.WorkspaceClaimedError{
+		OrgID:     "11111111-1111-4111-8111-111111111111",
+		SignInURL: "https://api.decionis.com/v1/public/connect/docker-desktop/start",
+	})
+
+	rec := postJSON(d, "/api/connect/auto", "{}")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("claimed workspace is a state, not an error: got %d body %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `"claimed":true`) || strings.Contains(body, `"connected":true`) {
+		t.Fatalf("claimed answer must report claimed and stay disconnected: %s", body)
+	}
+	if !strings.Contains(body, `"sign_in_url":"https://api.decionis.com/v1/public/connect/docker-desktop/start"`) {
+		t.Fatalf("claimed answer must carry the browser fallback: %s", body)
+	}
+
+	// Nothing was minted, so nothing may have been stored.
+	if _, _, ok, _ := d.store.Load(); ok {
+		t.Fatal("claimed workspace must not store credentials")
+	}
+}
+
+func TestAutoConnectClaimedDropsUnsafeSignInURL(t *testing.T) {
+	d := signupDaemon(t)
+	stubProvision(t, nil, &api.WorkspaceClaimedError{
+		OrgID:     "11111111-1111-4111-8111-111111111111",
+		SignInURL: "http://attacker.example/sign-in",
+	})
+
+	rec := postJSON(d, "/api/connect/auto", "{}")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("claimed workspace: got %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `"claimed":true`) {
+		t.Fatalf("claimed must still be reported: %s", body)
+	}
+	if strings.Contains(body, "sign_in_url") || strings.Contains(body, "attacker.example") {
+		t.Fatalf("plain-http non-loopback URLs must not reach the browser: %s", body)
+	}
 }
 
 func TestAutoConnectRefusesWhenAlreadyConnected(t *testing.T) {

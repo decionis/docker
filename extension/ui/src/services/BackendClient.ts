@@ -18,6 +18,21 @@ export interface DaemonStatus {
   last_error: string | null;
 }
 
+/**
+ * What an automatic signup can additionally learn. A fresh mint sets none of
+ * these (and an older daemon never sends them): `reused` means the control
+ * plane recognized this install and reconnected its existing workspace with
+ * a fresh key; `claimed` means that workspace now belongs to an account, so
+ * nothing was connected and the user signs in instead (`sign_in_url` is the
+ * plain-browser fallback).
+ */
+export interface AutoConnectStatus extends DaemonStatus {
+  reused?: boolean;
+  org_name?: string;
+  claimed?: boolean;
+  sign_in_url?: string;
+}
+
 export interface DecisionReport {
   evaluation_id: string;
   dossier_id: string;
@@ -270,11 +285,14 @@ export class BackendClient {
 
   /**
    * Automatic signup: asks the daemon to create a workspace with no account
-   * and no input at all. Used once, on first open.
+   * and no input at all. Used once, on first open. The daemon sends its
+   * persisted installation id with the request, so a repeat install lands
+   * back in its existing workspace (`reused`) or is told that workspace now
+   * belongs to an account (`claimed`) instead of minting a new one.
    */
-  connectAuto(baseUrl?: string): Promise<DaemonStatus> {
+  connectAuto(baseUrl?: string): Promise<AutoConnectStatus> {
     const body = baseUrl && baseUrl.trim() ? { base_url: baseUrl.trim() } : {};
-    return this.transport.request("POST", "/api/connect/auto", body) as Promise<DaemonStatus>;
+    return this.transport.request("POST", "/api/connect/auto", body) as Promise<AutoConnectStatus>;
   }
 
   /** Starts a one-click connect; the returned URL opens in the browser. */
