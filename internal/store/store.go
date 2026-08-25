@@ -29,8 +29,9 @@ func New(dir string) *Store {
 	return &Store{dir: dir}
 }
 
-func (s *Store) connectionPath() string { return filepath.Join(s.dir, "connection.json") }
-func (s *Store) apiKeyPath() string     { return filepath.Join(s.dir, "api-key") }
+func (s *Store) connectionPath() string     { return filepath.Join(s.dir, "connection.json") }
+func (s *Store) apiKeyPath() string         { return filepath.Join(s.dir, "api-key") }
+func (s *Store) installationIDPath() string { return filepath.Join(s.dir, "installation-id") }
 
 func writeFileAtomic(path string, data []byte) error {
 	temp, err := os.CreateTemp(filepath.Dir(path), ".tmp-*")
@@ -101,7 +102,44 @@ func (s *Store) Load() (connection Connection, apiKey string, ok bool, err error
 	return connection, apiKey, true, nil
 }
 
+// SaveInstallationID persists the installation id — the per-install
+// possession secret that lets an automatic signup return to the workspace a
+// previous signup minted instead of minting another. It is stored exactly
+// like the API key (own file, 0600, atomic write) because the control plane
+// treats it as a credential: possession alone re-keys an unclaimed
+// workspace.
+func (s *Store) SaveInstallationID(id string) error {
+	if strings.TrimSpace(id) == "" {
+		return errors.New("store: refusing to save an empty installation id")
+	}
+	if err := os.MkdirAll(s.dir, 0o700); err != nil {
+		return fmt.Errorf("store: create data dir: %w", err)
+	}
+	if err := writeFileAtomic(s.installationIDPath(), []byte(id)); err != nil {
+		return fmt.Errorf("store: write installation id: %w", err)
+	}
+	return nil
+}
+
+// LoadInstallationID returns the persisted installation id, or "" when none
+// has been saved yet.
+func (s *Store) LoadInstallationID() (string, error) {
+	raw, err := os.ReadFile(s.installationIDPath())
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", fmt.Errorf("store: read installation id: %w", err)
+	}
+	return strings.TrimSpace(string(raw)), nil
+}
+
 // Clear removes stored settings and the API key.
+//
+// The installation id deliberately survives: it identifies the install, not
+// the connection. Keeping it means the next automatic signup reconnects to
+// the workspace this install already minted (with a fresh key) instead of
+// creating another one.
 func (s *Store) Clear() error {
 	var firstErr error
 	for _, path := range []string{s.apiKeyPath(), s.connectionPath()} {

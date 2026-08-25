@@ -10,22 +10,24 @@ import (
 // stubPublicAPI stands in for the pre-auth client. Tests set only the
 // behaviour they care about; anything unset returns a benign zero.
 type stubPublicAPI struct {
-	workspace       *api.Workspace
-	workspaceErr    error
-	exchange        *api.EnrollmentExchange
-	exchangeErr     error
-	exchangeFn      func(token string) (*api.EnrollmentExchange, error)
-	seenUsername    string
-	seenEmail       string
-	seenPassword    string
-	seenToken       string
-	provisionCalls  int
-	credentialCalls int
+	workspace           *api.Workspace
+	workspaceErr        error
+	exchange            *api.EnrollmentExchange
+	exchangeErr         error
+	exchangeFn          func(token string) (*api.EnrollmentExchange, error)
+	seenUsername        string
+	seenEmail           string
+	seenPassword        string
+	seenToken           string
+	seenInstallationIDs []string
+	provisionCalls      int
+	credentialCalls     int
 }
 
-func (s *stubPublicAPI) ProvisionWorkspace(_ context.Context, dockerUsername string) (*api.Workspace, error) {
+func (s *stubPublicAPI) ProvisionWorkspace(_ context.Context, dockerUsername, installationID string) (*api.Workspace, error) {
 	s.provisionCalls++
 	s.seenUsername = dockerUsername
+	s.seenInstallationIDs = append(s.seenInstallationIDs, installationID)
 	return s.workspace, s.workspaceErr
 }
 

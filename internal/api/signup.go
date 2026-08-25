@@ -14,11 +14,31 @@ import (
 // Both the automatic-signup mint and the account sign-in return this shape,
 // and it matches EnrollmentExchange field-for-field, so the daemon stores
 // every connect path through one code path.
+//
+// Reused marks a provision the control plane resolved to this install's
+// existing workspace instead of minting a new one. RawKey is then a fresh
+// key and every previously issued key for the org was just revoked, so the
+// caller must overwrite whatever it had stored.
 type Workspace struct {
 	OrgID       string `json:"org_id"`
 	RawKey      string `json:"raw_key"`
 	OrgName     string `json:"org_name"`
 	Provisional bool   `json:"provisional"`
+	Reused      bool   `json:"reused"`
+}
+
+// WorkspaceClaimedError is the control plane refusing to re-key: the
+// workspace this install minted has since been claimed by a real account,
+// and possession of the installation id must not mint credentials for
+// someone's account. The user signs in instead; SignInURL is the plain
+// browser fallback for doing so.
+type WorkspaceClaimedError struct {
+	OrgID     string
+	SignInURL string
+}
+
+func (e *WorkspaceClaimedError) Error() string {
+	return "this workspace belongs to an account — sign in to reconnect it"
 }
 
 // Account sign-in failures the UI can act on. Response bodies are never
@@ -40,10 +60,20 @@ var (
 // signed-in Hub user to extensions, and the only local source is the
 // credential store, which would mean reading the user's Hub secret to learn
 // a display name. The control plane then names the workspace itself.
-func (c *Client) ProvisionWorkspace(ctx context.Context, dockerUsername string) (*Workspace, error) {
+//
+// installationID is this install's persisted possession secret (hashed at
+// rest server-side). Sent on every provision, it lets the control plane
+// answer with the workspace this install already minted — Reused, with a
+// fresh key — or a *WorkspaceClaimedError once that workspace belongs to an
+// account, instead of minting a new workspace per call. An older control
+// plane ignores the field and mints exactly as before.
+func (c *Client) ProvisionWorkspace(ctx context.Context, dockerUsername, installationID string) (*Workspace, error) {
 	payload := map[string]string{}
 	if trimmed := strings.TrimSpace(dockerUsername); trimmed != "" {
 		payload["docker_username"] = trimmed
+	}
+	if trimmed := strings.TrimSpace(installationID); trimmed != "" {
+		payload["installation_id"] = trimmed
 	}
 	return c.postWorkspace(ctx, "/v1/public/connect/docker-desktop/provision", payload)
 }
@@ -99,11 +129,23 @@ func (c *Client) postWorkspace(
 
 	switch response.StatusCode {
 	case http.StatusOK, http.StatusCreated:
-		var workspace Workspace
-		if err := json.Unmarshal(body, &workspace); err != nil ||
-			workspace.OrgID == "" || workspace.RawKey == "" {
+		// The claimed shape carries no raw_key on purpose — decode it before
+		// the credential validation below can mistake it for a broken mint.
+		var answer struct {
+			Workspace
+			Claimed   bool   `json:"claimed"`
+			SignInURL string `json:"sign_in_url"`
+		}
+		if err := json.Unmarshal(body, &answer); err != nil {
 			return nil, errors.New("decionis api: workspace request: malformed response")
 		}
+		if answer.Claimed {
+			return nil, &WorkspaceClaimedError{OrgID: answer.OrgID, SignInURL: answer.SignInURL}
+		}
+		if answer.OrgID == "" || answer.RawKey == "" {
+			return nil, errors.New("decionis api: workspace request: malformed response")
+		}
+		workspace := answer.Workspace
 		return &workspace, nil
 	case http.StatusUnauthorized:
 		return nil, ErrCredentialsInvalid

@@ -2,10 +2,13 @@ package daemon
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -18,7 +21,7 @@ import (
 // validated base URL, so a raw caller-supplied string never reaches
 // request construction.
 type publicAPI interface {
-	ProvisionWorkspace(ctx context.Context, dockerUsername string) (*api.Workspace, error)
+	ProvisionWorkspace(ctx context.Context, dockerUsername, installationID string) (*api.Workspace, error)
 	ConnectWithAccount(ctx context.Context, email, password string) (*api.Workspace, error)
 	ExchangeEnrollment(ctx context.Context, enrollmentToken string) (*api.EnrollmentExchange, error)
 }
@@ -34,13 +37,32 @@ type autoConnectRequest struct {
 	DockerUsername string `json:"docker_username"`
 }
 
+// autoConnectPayload is the status payload plus what only an automatic
+// signup can learn. A fresh mint sets none of the extras, so its JSON is
+// byte-for-byte the plain status an older UI already understands.
+type autoConnectPayload struct {
+	statusPayload
+	// Reused: this install's existing workspace came back with a fresh key
+	// (OrgName names it for the UI's notice).
+	Reused  bool   `json:"reused,omitempty"`
+	OrgName string `json:"org_name,omitempty"`
+	// Claimed: the workspace now belongs to an account, so nothing was
+	// minted or stored — the UI offers sign-in, with SignInURL as the plain
+	// browser fallback.
+	Claimed   bool   `json:"claimed,omitempty"`
+	SignInURL string `json:"sign_in_url,omitempty"`
+}
+
 // handleAutoConnect is the extension's first run: no account, no token, no
 // typing. The control plane mints a workspace and a scoped key, and the
 // daemon stores them exactly as it stores an exchanged enrollment.
 //
-// It is deliberately not idempotent-by-accident: an already-connected daemon
-// refuses, so a stray call can never replace a working connection (or a
-// claimed workspace) with a fresh empty one.
+// Every call sends the install's persisted installation id, so a repeat run
+// (data volume survived, credentials didn't — or the user disconnected)
+// resolves to the workspace this install already minted instead of minting
+// another. It is deliberately not idempotent-by-accident: an
+// already-connected daemon refuses, so a stray call can never replace a
+// working connection (or a claimed workspace) with a fresh empty one.
 func (d *Daemon) handleAutoConnect(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
 	var request autoConnectRequest
@@ -70,8 +92,22 @@ func (d *Daemon) handleAutoConnect(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), upstreamTimeout)
 	defer cancel()
 
-	workspace, err := client.ProvisionWorkspace(ctx, request.DockerUsername)
+	workspace, err := client.ProvisionWorkspace(ctx, request.DockerUsername, d.ensureInstallationID())
 	if err != nil {
+		var claimed *api.WorkspaceClaimedError
+		if errors.As(err, &claimed) {
+			// Not a failure: the workspace exists and has an owner. Nothing
+			// is stored — possession of the installation id must not mint
+			// credentials for an account — and the UI switches to sign-in.
+			d.mu.Lock()
+			payload := autoConnectPayload{statusPayload: d.statusLocked()}
+			d.mu.Unlock()
+			payload.Claimed = true
+			payload.SignInURL = browserSafeURL(claimed.SignInURL)
+			d.logger.Info("automatic signup found a claimed workspace", "org_id", claimed.OrgID)
+			writeJSON(w, http.StatusOK, payload)
+			return
+		}
 		d.logger.Info("automatic signup failed")
 		writeError(w, http.StatusBadGateway, "signup_unavailable",
 			"Decionis could not create a workspace right now. Try again, or connect an existing account under Advanced.")
@@ -84,10 +120,68 @@ func (d *Daemon) handleAutoConnect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	d.mu.Lock()
-	status := d.statusLocked()
+	payload := autoConnectPayload{statusPayload: d.statusLocked()}
 	d.mu.Unlock()
-	d.logger.Info("connected via automatic signup", "org_id", workspace.OrgID, "provisional", workspace.Provisional)
-	writeJSON(w, http.StatusOK, status)
+	if workspace.Reused {
+		// The control plane revoked every earlier key for this org when it
+		// minted the fresh one; the store above already holds the fresh key.
+		payload.Reused = true
+		payload.OrgName = workspace.OrgName
+		d.logger.Info("reconnected to existing workspace", "org_id", workspace.OrgID, "provisional", workspace.Provisional)
+	} else {
+		d.logger.Info("connected via automatic signup", "org_id", workspace.OrgID, "provisional", workspace.Provisional)
+	}
+	writeJSON(w, http.StatusOK, payload)
+}
+
+// ensureInstallationID returns this install's installation id, minting and
+// persisting one on first use. The id is a possession secret
+// (rules/security.rules.md Rule 2.4): it lives only in the daemon's private
+// data volume — the same store as the org API key — and is never logged or
+// sent to the UI. A store that cannot persist it degrades to today's
+// behavior (a fresh workspace per provision), never to a failure.
+func (d *Daemon) ensureInstallationID() string {
+	existing, err := d.store.LoadInstallationID()
+	if err != nil {
+		d.logger.Error("installation id unreadable", "detail", "storage error")
+	}
+	if existing != "" {
+		return existing
+	}
+
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		// No CSPRNG output means no id at all — a predictable id would be a
+		// forgeable possession secret.
+		d.logger.Error("installation id generation failed")
+		return ""
+	}
+	minted := "dcn_install_" + hex.EncodeToString(buf)
+	if err := d.store.SaveInstallationID(minted); err != nil {
+		d.logger.Error("installation id save failed", "detail", "storage error")
+	}
+	return minted
+}
+
+// browserSafeURL passes through a URL only when it is safe to hand to the
+// system browser: https anywhere, or plain http on loopback (development
+// control planes). Anything else is dropped — the UI still offers its
+// in-app sign-in paths.
+func browserSafeURL(raw string) string {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return ""
+	}
+	switch parsed.Scheme {
+	case "https":
+		return parsed.String()
+	case "http":
+		host := parsed.Hostname()
+		if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+			return parsed.String()
+		}
+	}
+	return ""
 }
 
 // connectWithCredentials resolves an account's email and password at the
